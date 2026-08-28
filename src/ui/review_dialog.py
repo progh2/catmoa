@@ -20,6 +20,27 @@ from src.extract.schema import ScheduleItem
 
 DEFAULT_LIST_LABEL = "(기본 목록)"
 
+# 고양이 말풍선과 같은 톤: 크림 배경 + 살구 테두리 + 파스텔 버튼 (회색 업무용 느낌 제거)
+REVIEW_QSS = """
+QDialog#reviewDialog, QDialog#editDialog { background: #fffaf0; }
+QLabel { color: #3a2e1e; }
+QPushButton { background: #ffffff; border: 1.5px solid #f0c27b; border-radius: 12px; padding: 5px 12px; color: #3a2e1e; }
+QPushButton:hover { background: #fff3e0; }
+QPushButton:pressed { background: #ffe6c4; }
+QPushButton:disabled { color: #b8ab9a; border-color: #eadfcf; background: #fdf8f1; }
+QPushButton#btnCal { background: #ffe9d6; border-color: #f2a65a; }
+QPushButton#btnCal:hover { background: #ffdcbb; }
+QPushButton#btnTask { background: #e3f6e8; border-color: #6fbf73; }
+QPushButton#btnTask:hover { background: #d2efd9; }
+QPushButton#btnBoth { background: #ece6fa; border-color: #a78bfa; }
+QPushButton#btnBoth:hover { background: #e0d6f7; }
+QPushButton#btnOk { background: #f2a65a; border-color: #e0903f; color: white; font-weight: 600; }
+QPushButton#btnOk:hover { background: #ea9a48; }
+QPushButton#btnAux { border-color: #eadfcf; color: #6b5d4c; padding: 3px 10px; }
+#reviewCard { background: #ffffff; border: 2px solid #f0c27b; border-radius: 16px; }
+QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { background: #ffffff; border: 1px solid #eadfcf; border-radius: 8px; padding: 2px 6px; }
+"""
+
 
 @dataclass
 class Decision:
@@ -90,7 +111,7 @@ class _Row(QFrame):
         # 대상 선택 묶음 — 제목·알람과 시각적으로 구분
         self.target_box = QFrame(objectName="targetBox")
         self.target_box.setStyleSheet(
-            "#targetBox { background: palette(alternate-base); border: 1px solid palette(mid); border-radius: 6px; }")
+            "#targetBox { background: #fff6e8; border: 1px solid #f0c27b; border-radius: 10px; }")
         tb = QHBoxLayout(self.target_box)
         tb.setContentsMargins(8, 2, 8, 2)
         tb.setSpacing(8)
@@ -187,8 +208,8 @@ class _Row(QFrame):
                   self.has_end, self.end_date, self.end_time, self.location):
             w.setEnabled(on)
         self.tasklist.setEnabled(self.task.isChecked())
-        self.setStyleSheet("_Row { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; }"
-                           if on else "_Row { background: palette(window); border: 1px dashed palette(mid); border-radius: 8px; }")
+        self.setStyleSheet("_Row { background: #ffffff; border: 2px solid #f0c27b; border-radius: 14px; }"
+                           if on else "_Row { background: #fdf8f1; border: 2px dashed #eadfcf; border-radius: 14px; }")
         undated = self.no_date.isChecked()
         if undated:
             # 날짜 없는 할 일: 캘린더 불가, 날짜/시간/알람 비활성
@@ -259,11 +280,14 @@ class EditDialog(QDialog):
 
     def __init__(self, row: _Row, parent: QWidget | None = None):
         super().__init__(parent)
+        self.setObjectName("editDialog")
+        self.setStyleSheet(REVIEW_QSS)
         self.setWindowTitle("상세 수정")
-        self.setMinimumWidth(820)
+        self.setMinimumWidth(760)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self._row = row
         lay = QVBoxLayout(self)
+        lay.setContentsMargins(12, 12, 12, 10)
         lay.addWidget(row)
         row.show()
         foot = QHBoxLayout()
@@ -295,9 +319,11 @@ class ReviewDialog(QDialog):
                  preview_text: str = "", tasklists: list[tuple[str, str]] | None = None,
                  parent: QWidget | None = None):
         super().__init__(parent)
+        self.setObjectName("reviewDialog")
+        self.setStyleSheet(REVIEW_QSS)
         self.setWindowTitle(f"catmoa — {source_label}" if source_label else "catmoa")
-        self.setMinimumWidth(460)
-        self.resize(500, 340)
+        self.setMinimumWidth(380)
+        self.resize(410, 280)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         tasklists = tasklists or []
         self._settings = settings
@@ -314,15 +340,15 @@ class ReviewDialog(QDialog):
         self._done: list[bool] = [False] * len(self.rows)   # 카드에서 처리(선택/건너뜀)했는지
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(18, 14, 18, 14)
-        lay.setSpacing(10)
+        lay.setContentsMargins(14, 10, 14, 10)
+        lay.setSpacing(8)
 
         # 진행 표시
         top = QHBoxLayout()
         self.progress_label = QLabel()
-        self.progress_label.setStyleSheet("color: palette(mid); font-size: 12px;")
+        self.progress_label.setStyleSheet("color: #f2a65a; font-size: 12px; letter-spacing: 2px;")
         self.source_label = QLabel(source_label)
-        self.source_label.setStyleSheet("color: palette(mid); font-size: 12px;")
+        self.source_label.setStyleSheet("color: #a08f7a; font-size: 11px;")
         top.addWidget(self.source_label)
         top.addStretch(1)
         top.addWidget(self.progress_label)
@@ -330,21 +356,19 @@ class ReviewDialog(QDialog):
 
         # 카드
         self.card = QFrame(objectName="reviewCard")
-        self.card.setStyleSheet(
-            "#reviewCard { background: palette(base); border: 1px solid palette(mid); border-radius: 14px; }")
         card_lay = QVBoxLayout(self.card)
-        card_lay.setContentsMargins(22, 20, 22, 18)
-        card_lay.setSpacing(8)
+        card_lay.setContentsMargins(16, 13, 16, 11)
+        card_lay.setSpacing(5)
         self.card_title = QLabel()
         self.card_title.setWordWrap(True)
-        self.card_title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        self.card_title.setStyleSheet("font-size: 16px; font-weight: 600;")
         self.card_when = QLabel()
-        self.card_when.setStyleSheet("font-size: 14px;")
+        self.card_when.setStyleSheet("font-size: 13px;")
         self.card_where = QLabel()
-        self.card_where.setStyleSheet("font-size: 13px; color: palette(mid);")
+        self.card_where.setStyleSheet("font-size: 12px; color: #8a7a66;")
         self.card_where.setWordWrap(True)
         self.card_choice = QLabel()
-        self.card_choice.setStyleSheet("font-size: 12px; color: palette(mid);")
+        self.card_choice.setStyleSheet("font-size: 11px; color: #a08f7a;")
         card_lay.addWidget(self.card_title)
         card_lay.addWidget(self.card_when)
         card_lay.addWidget(self.card_where)
@@ -358,8 +382,11 @@ class ReviewDialog(QDialog):
         self.btn_cal = QPushButton("📅 캘린더")
         self.btn_task = QPushButton("✅ 태스크")
         self.btn_both = QPushButton("📅+✅ 둘 다")
+        self.btn_cal.setObjectName("btnCal")
+        self.btn_task.setObjectName("btnTask")
+        self.btn_both.setObjectName("btnBoth")
         for b, t in ((self.btn_cal, {"calendar"}), (self.btn_task, {"task"}), (self.btn_both, {"calendar", "task"})):
-            b.setMinimumHeight(40)
+            b.setMinimumHeight(34)
             b.clicked.connect(lambda _=False, tt=t: self._choose(tt))
             choose.addWidget(b, 1)
         lay.addLayout(choose)
@@ -375,6 +402,8 @@ class ReviewDialog(QDialog):
         self.btn_rest = QPushButton("나머지 기본대로")
         self.btn_rest.setToolTip("남은 항목을 AI 제안(또는 설정의 기본 대상)대로 한 번에 처리")
         self.btn_rest.clicked.connect(self._rest_default)
+        for b in (self.btn_prev, self.btn_skip, self.btn_edit, self.btn_rest):
+            b.setObjectName("btnAux")
         aux.addWidget(self.btn_prev)
         aux.addStretch(1)
         aux.addWidget(self.btn_skip)
@@ -388,7 +417,10 @@ class ReviewDialog(QDialog):
         self.btn_cancel = QPushButton("취소")
         self.btn_cancel.clicked.connect(self.reject)
         self.ok = QPushButton("등록")
-        self.ok.setMinimumHeight(40)
+        self.ok.setObjectName("btnOk")
+        self.ok.setMinimumHeight(34)
+        self.ok.setMinimumWidth(96)
+        self.btn_cancel.setObjectName("btnAux")
         self.ok.clicked.connect(self._submit)
         foot.addWidget(self.btn_cancel)
         foot.addWidget(self.ok)
@@ -396,7 +428,7 @@ class ReviewDialog(QDialog):
 
         self.note = QLabel()
         self.note.setWordWrap(True)
-        self.note.setStyleSheet("color: #b8860b; font-size: 11px;")
+        self.note.setStyleSheet("color: #c58a2a; font-size: 10px;")
         lay.addWidget(self.note)
 
         # 단축키: 1/2/3 선택, S 건너뛰기, E 수정, ← 이전
@@ -437,7 +469,7 @@ class ReviewDialog(QDialog):
             cal = sum(1 for d in ds if "calendar" in d.targets)
             task = sum(1 for d in ds if "task" in d.targets)
             skipped = n - len(ds)
-            self.progress_label.setText(f"{n} / {n}")
+            self.progress_label.setText("●" * min(n, 12) + f"  {n} / {n}")
             self.card_title.setText(f"{len(ds)}개 등록 준비 완료" if ds else "등록할 항목이 없어요")
             parts = []
             if cal:
@@ -456,7 +488,8 @@ class ReviewDialog(QDialog):
 
         row = self.rows[self._idx]
         it = row.item
-        self.progress_label.setText(f"{self._idx + 1} / {n}")
+        dots = ("●" * self._idx + "◉" + "○" * (n - self._idx - 1)) if n <= 12 else ""
+        self.progress_label.setText(f"{dots}  {self._idx + 1} / {n}".strip())
         self.card_title.setText(it.title)
         when = "날짜 없음 (마감 없는 할 일)" if row.no_date.isChecked() else self._describe_row(row)
         self.card_when.setText(("🗓  " if not row.no_date.isChecked() else "☑  ") + when)

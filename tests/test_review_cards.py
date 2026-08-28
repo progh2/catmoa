@@ -29,13 +29,14 @@ def _items():
 
 def test_card_flow_choose_skip_summary(app):
     d = ReviewDialog(_items(), cfg.ScheduleSettings(alarm_enabled=True, alarm_minutes=20), tasklists=LISTS)
-    assert d.progress_label.text() == "1 / 3" and d.card_title.text() == "운영위원회" and "14:00~16:00" in d.card_when.text()
+    assert d.progress_label.text().endswith("1 / 3") and d.progress_label.text().startswith("◉○○")
+    assert d.card_title.text() == "운영위원회" and "14:00~16:00" in d.card_when.text()
     assert "📍 회의실" in d.card_where.text() and "AI 제안: 📅 캘린더" in d.card_choice.text()
     assert not d.btn_prev.isVisible() if d.isVisible() else True
     d._choose({"calendar", "task"})                       # 1번: 둘 다
-    assert d.progress_label.text() == "2 / 3" and "📂 학교" in d.card_where.text()
+    assert d.progress_label.text().endswith("2 / 3") and "📂 학교" in d.card_where.text()
     d._skip()                                             # 2번: 건너뛰기
-    assert d.progress_label.text() == "3 / 3" and "날짜 없음" in d.card_when.text()
+    assert d.progress_label.text().endswith("3 / 3") and "날짜 없음" in d.card_when.text()
     assert not d.btn_cal.isEnabled() and not d.btn_both.isEnabled()   # 날짜 없는 할 일은 태스크만
     d._choose({"calendar"})                               # 캘린더를 눌러도 태스크로 보정
     assert d.at_summary and "2개 등록 준비 완료" in d.card_title.text()
@@ -45,9 +46,9 @@ def test_card_flow_choose_skip_summary(app):
     assert ds[0].alarm_minutes == 20 and ds[1].alarm_minutes is None
     # 이전으로 돌아가 바꾸기
     d._prev()
-    assert d.progress_label.text() == "3 / 3" and "선택됨" in d.card_choice.text()
+    assert d.progress_label.text().endswith("3 / 3") and "선택됨" in d.card_choice.text()
     d._prev(); d._prev()
-    assert d.progress_label.text() == "1 / 3" and "선택됨: 📅+✅ 둘 다" in d.card_choice.text()
+    assert d.progress_label.text().endswith("1 / 3") and "선택됨: 📅+✅ 둘 다" in d.card_choice.text()
     got = []
     d.submitted.connect(got.append)
     d._rest_default()                                     # 나머지 기본대로 → 요약
