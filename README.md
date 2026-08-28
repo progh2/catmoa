@@ -56,9 +56,15 @@
 
 | OS | 파일 | 실행 |
 |---|---|---|
-| macOS (Apple Silicon) | `catmoa-macos-arm64.zip` | 압축 해제 → `catmoa.app`을 응용 프로그램 폴더로 → **우클릭 → 열기** (처음 한 번, Gatekeeper). 그래도 막히면 터미널에서 `xattr -cr /Applications/catmoa.app` |
+| macOS (Apple Silicon) | `catmoa-macos-arm64.zip` | 압축 해제 → `catmoa.app`을 응용 프로그램 폴더로. 처음 실행 시 "악성 코드가 없음을 확인할 수 없음" 경고가 뜨면 아래 [macOS 첫 실행](#macos-첫-실행) 참고 |
 | Windows 10/11 | `catmoa-windows-x86_64.zip` | 압축 해제 → `catmoa\catmoa.exe`. SmartScreen 경고가 뜨면 **추가 정보 → 실행** |
 | Linux (x86_64) | `catmoa-linux-x86_64.tar.gz` | 압축 해제 → `./catmoa/catmoa`. X11 권장 (Wayland는 항상-위 창이 제한될 수 있음) |
+
+#### macOS 첫 실행
+서명·공증이 되지 않은 앱이라 macOS가 한 번 막습니다 (macOS 15 Sequoia부터는 "우클릭 → 열기"도 통하지 않습니다). 둘 중 하나로 한 번만 허용하면 됩니다.
+
+- **시스템 설정으로 허용**: 앱을 실행해 경고가 뜨면 **완료** → **시스템 설정 → 개인정보 보호 및 보안** → 아래쪽 `"catmoa"이(가) 차단되었습니다` 옆 **그래도 열기** → 비밀번호/Touch ID
+- **터미널로 격리 속성 제거**: `xattr -cr /Applications/catmoa.app` (zip 압축 해제 시 붙는 `com.apple.quarantine` 속성을 지웁니다)
 
 앱은 Dock/작업표시줄에 나타나지 않고 고양이만 화면에 떠 있습니다. 종료는 고양이 **우클릭 → 종료**.
 

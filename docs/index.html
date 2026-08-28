@@ -307,7 +307,12 @@
       <details>
         <summary>처음 실행할 때 경고가 떠요</summary>
         <ul>
-          <li><b>macOS</b>: 압축 해제 후 앱을 <b>우클릭 → 열기</b> (Gatekeeper 확인 창에서 "열기")</li>
+          <li><b>macOS</b> — "악성 코드가 없음을 확인할 수 없음" 경고가 뜨면 (서명·공증 전이라 정상이에요. macOS 15부터는 우클릭 → 열기가 통하지 않습니다):
+            <ul style="margin-top:4px">
+              <li>경고 창에서 <b>완료</b> → <b>시스템 설정 → 개인정보 보호 및 보안</b> → 아래쪽 <b>"catmoa"이(가) 차단되었습니다</b> 옆 <b>그래도 열기</b> → 비밀번호/Touch ID. 한 번만 하면 돼요.</li>
+              <li>또는 터미널에서 <code>xattr -cr /Applications/catmoa.app</code> (앱을 둔 경로로)</li>
+            </ul>
+          </li>
           <li><b>Windows</b>: SmartScreen 창에서 <b>추가 정보 → 실행</b></li>
           <li><b>Linux</b>: <code>tar xzf catmoa-linux-*.tar.gz && ./catmoa/catmoa</code></li>
         </ul>
