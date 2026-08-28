@@ -46,13 +46,28 @@ def test_check_latest_newer_and_uptodate():
 
 def test_check_latest_missing_asset_and_network_error():
     tr = httpx.MockTransport(lambda r: httpx.Response(200, json=_release("v99.0.0", assets=["other.zip"])))
-    with pytest.raises(updater.UpdateError, match="이 OS용 파일"):
+    with pytest.raises(updater.UpdateError, match="용 파일이 아직 없습니다"):
         updater.check_latest(transport=tr)
 
     def boom(r):
         raise httpx.ConnectError("no net")
     with pytest.raises(updater.UpdateError, match="연결"):
         updater.check_latest(transport=httpx.MockTransport(boom))
+
+
+def test_windows_arm_falls_back_to_x86_64(monkeypatch):
+    monkeypatch.setattr(updater, "platform_key", lambda: ("windows", "arm64"))
+    assert updater.asset_candidates() == ["catmoa-windows-arm64.exe", "catmoa-windows-x86_64.exe"]
+    rel = {"tag_name": "v99.0.0", "body": "", "html_url": "https://x",
+           "assets": [{"name": "catmoa-windows-x86_64.exe", "browser_download_url": "https://x/w.exe", "size": 5},
+                      {"name": "catmoa-macos-arm64.dmg", "browser_download_url": "https://x/m.dmg", "size": 5}]}
+    info = updater.check_latest(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=rel)))
+    assert info and info.asset_name == "catmoa-windows-x86_64.exe"
+
+    monkeypatch.setattr(updater, "platform_key", lambda: ("linux", "arm64"))
+    assert updater.asset_candidates() == ["catmoa-linux-arm64.tar.gz"]     # 폴백 없음
+    with pytest.raises(updater.UpdateError, match="linux/arm64"):
+        updater.check_latest(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=rel)))
 
 
 def test_download_with_progress(tmp_path):

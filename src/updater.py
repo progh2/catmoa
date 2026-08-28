@@ -76,6 +76,20 @@ def asset_name_for_platform() -> str:
     return f"catmoa-{name}-{arch}.{ext}"
 
 
+def asset_candidates() -> list[str]:
+    """우선순위대로 찾을 산출물 이름. 정확한 아키텍처가 없으면 에뮬레이션으로 돌릴 수 있는 것으로 폴백.
+
+    - Windows on ARM (Parallels 등): x64 에뮬레이션이 있으므로 x86_64 exe 로 폴백
+    - Linux aarch64: x86_64 는 못 돌리므로 폴백 없음
+    """
+    name, arch = platform_key()
+    ext = {"macos": "dmg", "windows": "exe"}.get(name, "tar.gz")
+    cands = [f"catmoa-{name}-{arch}.{ext}"]
+    if name == "windows" and arch != "x86_64":
+        cands.append(f"catmoa-windows-x86_64.{ext}")
+    return cands
+
+
 def is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
@@ -112,10 +126,12 @@ def check_latest(transport=None, timeout: float = 10.0) -> UpdateInfo | None:
     version = tag.lstrip("vV")
     if not is_newer(version):
         return None
-    want = asset_name_for_platform()
-    asset = next((a for a in data.get("assets", []) if a.get("name") == want), None)
+    assets = {a.get("name"): a for a in data.get("assets", [])}
+    asset = next((assets[c] for c in asset_candidates() if c in assets), None)
     if asset is None:
-        raise UpdateError(f"새 버전 {tag} 이 있지만 이 OS용 파일({want})이 아직 없습니다. {RELEASES_PAGE}")
+        name, arch = platform_key()
+        raise UpdateError(f"새 버전 {tag} 이 있지만 이 환경({name}/{arch})용 파일이 아직 없습니다. "
+                          f"릴리스 페이지에서 직접 내려받으세요: {RELEASES_PAGE}")
     return UpdateInfo(version=version, tag=tag, notes=(data.get("body") or "").strip(),
                       html_url=data.get("html_url", RELEASES_PAGE), asset_name=asset["name"],
                       asset_url=asset["browser_download_url"], asset_size=int(asset.get("size") or 0))

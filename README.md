@@ -58,7 +58,7 @@
 | OS | 파일 | 실행 |
 |---|---|---|
 | macOS (Apple Silicon) | `catmoa-macos-arm64.dmg` | 더블클릭 → `catmoa.app`을 Applications 로 드래그. 처음 실행 시 "악성 코드가 없음을 확인할 수 없음" 경고가 뜨면 아래 [macOS 첫 실행](#macos-첫-실행) 참고 |
-| Windows 10/11 | `catmoa-windows-x86_64.exe` | 단일 실행 파일 — 원하는 폴더에 두고 더블클릭 (첫 화면까지 몇 초 걸림). 브라우저·SmartScreen 경고가 뜨면 **유지 / 추가 정보 → 실행** |
+| Windows 10/11 | `catmoa-windows-x86_64.exe` | 단일 실행 파일 — 원하는 폴더에 두고 더블클릭 (첫 화면까지 몇 초 걸림). 브라우저·SmartScreen 경고가 뜨면 **유지 / 추가 정보 → 실행**. Windows on ARM(Parallels·Surface 등)도 같은 파일을 쓰면 됩니다(x64 에뮬레이션) |
 | Linux (x86_64) | `catmoa-linux-x86_64.tar.gz` | 압축 해제 → `./catmoa/catmoa`. X11 권장 (Wayland는 항상-위 창이 제한될 수 있음) |
 
 #### macOS 첫 실행
