@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 빌드 산출물
+build/
+dist/
+*.spec.bak
+
+# 빌드 시 주입되는 비밀 (GitHub Secrets → 생성)
+src/_secrets.py
+
+# 로컬 설정/토큰 (실제 저장 위치는 platformdirs, 여기는 안전장치)
+*.token.json
+client_secret*.json
+
+# 테스트 임시 파일
+tests/_tmp/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
