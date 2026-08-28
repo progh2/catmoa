@@ -285,15 +285,15 @@
     <p class="lead">Python 설치 없이 압축만 풀면 바로 실행됩니다.</p>
     <div class="box">
       <div class="dl-grid">
-        <a class="dl" data-os="mac" id="dl-mac" href="https://github.com/progh2/catmoa/releases/latest">
+        <a class="dl" data-os="mac" id="dl-mac" href="https://github.com/progh2/catmoa/releases/latest/download/catmoa-macos-arm64.zip">
           <div class="os">🍎</div><div class="name">macOS</div>
           <div class="file">catmoa-macos-arm64.zip</div><div class="you">✨ 지금 사용 중인 OS</div>
         </a>
-        <a class="dl" data-os="win" id="dl-win" href="https://github.com/progh2/catmoa/releases/latest">
+        <a class="dl" data-os="win" id="dl-win" href="https://github.com/progh2/catmoa/releases/latest/download/catmoa-windows-x86_64.zip">
           <div class="os">🪟</div><div class="name">Windows 10+</div>
           <div class="file">catmoa-windows-x86_64.zip</div><div class="you">✨ 지금 사용 중인 OS</div>
         </a>
-        <a class="dl" data-os="linux" id="dl-linux" href="https://github.com/progh2/catmoa/releases/latest">
+        <a class="dl" data-os="linux" id="dl-linux" href="https://github.com/progh2/catmoa/releases/latest/download/catmoa-linux-x86_64.tar.gz">
           <div class="os">🐧</div><div class="name">Linux</div>
           <div class="file">catmoa-linux-x86_64.tar.gz</div><div class="you">✨ 지금 사용 중인 OS</div>
         </a>
@@ -385,12 +385,18 @@ run.cmd       # Windows</pre>
   cat.addEventListener("click", () => { state = "happy"; setTimeout(() => state = "idle", 1500); });
 
   // ── OS 감지 ──
-  const ua = navigator.userAgent, plat = navigator.platform || "";
-  const os = /Mac/i.test(plat) ? "mac" : /Win/i.test(plat) ? "win" : /Linux/i.test(plat) && !/Android/i.test(ua) ? "linux" : null;
+  const ua = navigator.userAgent;
+  const plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  const mobile = /Android|iPhone|iPad|iPod/i.test(ua) || (navigator.maxTouchPoints > 1 && /Mac/i.test(plat)); // iPadOS는 Mac으로 위장
+  const os = mobile ? null : /Mac/i.test(plat) ? "mac" : /Win/i.test(plat) ? "win" : /Linux|X11/i.test(plat) ? "linux" : null;
   const names = { mac: "macOS", win: "Windows", linux: "Linux" };
+  const heroDl = document.getElementById("heroDl");
   if (os) {
-    document.getElementById("dl-" + os).classList.add("mine");
-    document.getElementById("heroDl").textContent = "⬇️ " + names[os] + "용 다운로드";
+    const mine = document.getElementById("dl-" + os);
+    mine.classList.add("mine");
+    // API 응답 전/실패 시에도 바로 파일로 가도록 고정 URL(releases/latest/download/…) 사용
+    heroDl.href = mine.href;
+    heroDl.textContent = "⬇️ " + names[os] + "용 다운로드";
   }
 
   // ── 최신 릴리스 정보 (GitHub API) ──
@@ -411,7 +417,7 @@ run.cmd       # Windows</pre>
           el.querySelector(".file").textContent = `${a.name} · ${(a.size / 1048576).toFixed(0)} MB`;
         }
       }
-      if (os && pick(map[os])) document.getElementById("heroDl").href = pick(map[os]).browser_download_url;
+      if (os && pick(map[os])) heroDl.href = pick(map[os]).browser_download_url;
       const date = new Date(rel.published_at).toLocaleDateString("ko-KR");
       document.getElementById("version").innerHTML =
         `최신 버전 <b>${rel.tag_name}</b> · ${date} · <a href="${rel.html_url}" target="_blank" rel="noopener">릴리스 노트</a>`;
