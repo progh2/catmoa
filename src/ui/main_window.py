@@ -36,7 +36,8 @@ class AppController:
         self.cat.inbox_requested.connect(self.import_inbox)
         self.cat.quit_requested.connect(self.quit)
 
-        self.worker = PipelineWorker(lambda: create_provider(self.config.llm))
+        # 부모를 위젯으로 두어 종료 시 C++/Python 소유권 충돌("shared QObject was deleted directly")을 막는다
+        self.worker = PipelineWorker(lambda: create_provider(self.config.llm), parent=self.cat)
         self.worker.phase.connect(self._on_phase)
         self.worker.queue_size.connect(self.cat.set_queue_size)
         self.worker.result.connect(self.on_result)
@@ -49,7 +50,7 @@ class AppController:
         self._boxes: list[QMessageBox] = []
 
         # 쿨메신저 폴링 (설정에서 켠 경우에만 동작)
-        self.coolm = CoolmWatcher(self.config)
+        self.coolm = CoolmWatcher(self.config, parent=self.cat)
         self.coolm.new_items.connect(self.on_items)
         self.coolm.error.connect(self._on_coolm_error)
         self.coolm.status.connect(lambda s: log.info("쿨메신저: %s", s))
