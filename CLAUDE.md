@@ -12,7 +12,9 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.4.10 — 검토창 카드형 개편(#47): ReviewDialog 는 _Row(숨김 모델) 위의 카드 위저드(📅/✅/둘 다/건너뛰기/수정…/나머지 기본대로/이전, 요약 카드→등록, 단축키 1/2/3/S/E). EditDialog 는 _Row 를 붙였다 떼어냄(파괴 방지). 알람은 설정 기본값. v1.4.9 릴리스 완료
+- intent: v1.4.11 — 개인정보 마스킹(#48: src/privacy/{rules,masker}.py, Extractor(mask_pii=), 원문 source_text 는 마스킹 안 함, 설정 '분류 규칙' 탭 체크박스, 프롬프트 규칙 17), 검토창 얇게+체크박스(#49/#50: REVIEW_QSS, 350×228, chk_cal/chk_task + [다음 →]), 중복 실행 방지(#51: src/single_instance.py — instance.json(pid+version)+QLocalServer, 구버전이면 taskkill/SIGTERM 후 이어받기), 쿨메신저 '지금 확인' 실패 원인(#52)
+- **#52 원인**: `_run_bg` 의 콜백이 AppController(=QObject 아님)의 평범한 함수라 Qt 가 DirectConnection 으로 붙여 **워커 스레드에서 GUI 를 건드렸다**. `QTimer.singleShot(0, self.cat, ...)` 로 메인 스레드에 넘기도록 수정 + 폴더 없음은 실행 전에 걸러 설정으로 안내 + _Task 가 traceback 을 로그에 남김
+- (이전) v1.4.10 — 검토창 카드형 개편(#47): ReviewDialog 는 _Row(숨김 모델) 위의 카드 위저드(📅/✅/둘 다/건너뛰기/수정…/나머지 기본대로/이전, 요약 카드→등록, 단축키 1/2/3/S/E). EditDialog 는 _Row 를 붙였다 떼어냄(파괴 방지). 알람은 설정 기본값. v1.4.9 릴리스 완료
 - (이전) v1.4.9 — 고양이 크기 배율(#45: config.ui.cat_scale 0.5~3.0, cat_faces.load_cat_images(scale), CatWidget.set_scale/_lock_size, HairpinBadge.set_scale, 설정 일반 탭 QSlider). 랜딩 '놀아줘요' 카드(#44), README 아이콘(#43). v1.4.8 릴리스 완료
 - (이전) v1.4.8 — 캘린더 설명·태스크 메모 하단에 원문(ScheduleItem.source_text, 설정 source_text_chars 기본 1500, 0=끔) (#42). v1.4.7: 설정 '교사' 탭(#41): TeacherSettings(출근/퇴근, 학교급 40/45/50, 교시 7개, 점심, autofill/describe) → 프롬프트 '시간표 참고' + 규칙 16. Ollama 실검증 4/4. v1.4.6 릴리스 완료(4방향 호버, 파비콘)
 - (이전) v1.4.6 — 4방향 호버 시선(hover_tl/tr/bl/br, 사용자 이미지 4장 → cat-src, prepare_cat OPTIONAL 매핑), 파비콘(favicon.ico/apple-touch-icon, ?v=3), 랜딩 시선 추적. **규칙: 사용자 요청은 먼저 이슈 등록 후 커밋에 closes #N** (#33~#40 소급 등록, 마일스톤 v1.5 표정·편의)
