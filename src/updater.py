@@ -2,7 +2,9 @@
 
 1. GitHub Releases `latest` 조회 → 현재 버전보다 새로우면 UpdateInfo
 2. OS/아키텍처에 맞는 산출물 다운로드 (진행률 콜백)
-3. 압축 해제 후, 앱 종료를 기다렸다가 설치 폴더를 교체하고 재실행하는 스크립트를 띄운다
+   macOS → .dmg (catmoa.app), Windows → 단일 .exe, Linux → .tar.gz (catmoa/ 폴더)
+3. 새 앱을 꺼낸 뒤(dmg 마운트·복사 / tar 해제 / exe 는 그대로), 앱 종료를 기다렸다가
+   설치 대상(.app 번들 / exe 파일 / 폴더)을 교체하고 재실행하는 스크립트를 띄운다
    (실행 중인 바이너리는 스스로 덮어쓸 수 없으므로 외부 스크립트가 처리)
 
 PyInstaller 로 얼린(frozen) 실행 파일에서만 설치가 가능하다. 소스 실행 중이면 안내만 한다.
@@ -70,7 +72,7 @@ def platform_key() -> tuple[str, str]:
 
 def asset_name_for_platform() -> str:
     name, arch = platform_key()
-    ext = "tar.gz" if name == "linux" else "zip"
+    ext = {"macos": "dmg", "windows": "exe"}.get(name, "tar.gz")
     return f"catmoa-{name}-{arch}.{ext}"
 
 
@@ -79,12 +81,15 @@ def is_frozen() -> bool:
 
 
 def install_root() -> Path:
-    """교체 대상: macOS 는 .app 번들, 그 외는 onedir 폴더."""
+    """교체 대상: macOS 는 .app 번들, Windows 는 단일 exe 파일, Linux 는 onedir 폴더."""
     exe = Path(sys.executable).resolve()
-    if platform.system() == "Darwin":
+    sysname = platform.system()
+    if sysname == "Darwin":
         for p in exe.parents:
             if p.suffix == ".app":
                 return p
+    elif sysname == "Windows":
+        return exe
     return exe.parent
 
 
@@ -140,12 +145,30 @@ def download(info: UpdateInfo, progress: Callable[[int, int], None] | None = Non
     return dest
 
 
+def _extract_dmg(dmg: Path, out: Path) -> None:
+    mnt = out.parent / "mnt"
+    mnt.mkdir(exist_ok=True)
+    subprocess.check_call(["hdiutil", "attach", "-nobrowse", "-readonly", "-quiet",
+                           "-mountpoint", str(mnt), str(dmg)])
+    try:
+        app = next((p for p in mnt.iterdir() if p.suffix == ".app"), None)
+        if app is None:
+            raise UpdateError("dmg 안에서 앱을 찾을 수 없습니다.")
+        subprocess.check_call(["ditto", str(app), str(out / app.name)])
+    finally:
+        subprocess.call(["hdiutil", "detach", "-quiet", "-force", str(mnt)])
+
+
 def extract(archive: Path) -> Path:
-    """압축을 풀고 새 앱 루트(catmoa.app 또는 catmoa/)를 돌려준다."""
+    """다운로드한 파일에서 새 앱(catmoa.app / catmoa/ 폴더 / catmoa.exe)을 꺼내 그 경로를 돌려준다."""
+    if archive.name.endswith(".exe"):
+        return archive  # 단일 실행 파일: 그대로 교체
     out = archive.parent / "extracted"
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir()
-    if archive.name.endswith(".zip"):
+    if archive.name.endswith(".dmg"):
+        _extract_dmg(archive, out)
+    elif archive.name.endswith(".zip"):
         if platform.system() == "Darwin":
             # 심볼릭 링크·실행 권한 보존을 위해 ditto 사용
             subprocess.check_call(["ditto", "-x", "-k", str(archive), str(out)])
@@ -168,20 +191,31 @@ def extract(archive: Path) -> Path:
 # ---------------------------------------------------------------- 교체 스크립트
 
 def make_swap_script(new_root: Path, target: Path, pid: int, script_dir: Path) -> tuple[list[str], Path]:
-    """앱 종료 대기 → 기존 폴더 백업/삭제 → 새 폴더 이동 → 재실행. (명령, 스크립트 경로)"""
+    """앱 종료 대기 → 기존 항목 백업/삭제 → 새 항목 이동 → 재실행. (명령, 스크립트 경로)
+
+    target 이 파일(단일 exe)이면 파일 교체, 폴더(.app / onedir)면 폴더 교체.
+    """
     sysname = platform.system()
     if sysname == "Windows":
         script = script_dir / "catmoa_update.cmd"
-        exe = target / "catmoa.exe"
+        old = f"{target}.old"
+        if target.suffix.lower() == ".exe" or new_root.suffix.lower() == ".exe":
+            exe = target
+            clean = f'del /f /q "{old}" 2>NUL'
+            move_new = f'move /y "{new_root}" "{target}" >NUL'
+        else:
+            exe = target / "catmoa.exe"
+            clean = f'rmdir /s /q "{old}" 2>NUL'
+            move_new = f'move "{new_root}" "{target}" >NUL'
         script.write_text(
             "@echo off\r\n"
             f":wait\r\ntasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL && (timeout /t 1 /nobreak >NUL & goto wait)\r\n"
-            f"rmdir /s /q \"{target}.old\" 2>NUL\r\n"
-            f"move \"{target}\" \"{target}.old\" >NUL\r\n"
-            f"move \"{new_root}\" \"{target}\" >NUL\r\n"
-            f"rmdir /s /q \"{target}.old\" 2>NUL\r\n"
-            f"start \"\" \"{exe}\"\r\n"
-            f"del \"%~f0\"\r\n",
+            f"{clean}\r\n"
+            f'move /y "{target}" "{old}" >NUL\r\n'
+            f"{move_new}\r\n"
+            f"{clean}\r\n"
+            f'start "" "{exe}"\r\n'
+            f'del "%~f0"\r\n',
             encoding="utf-8",
         )
         return ["cmd", "/c", str(script)], script
@@ -205,7 +239,7 @@ def make_swap_script(new_root: Path, target: Path, pid: int, script_dir: Path) -
 
 
 def apply(archive: Path, quit_app: Callable[[], None]) -> None:
-    """압축 해제 → 교체 스크립트 실행 → 앱 종료. frozen 이 아니면 UpdateError."""
+    """새 앱 꺼내기 → 교체 스크립트 실행 → 앱 종료. frozen 이 아니면 UpdateError."""
     if not is_frozen():
         raise UpdateError("소스로 실행 중이라 자동 설치를 할 수 없습니다. `git pull` 후 다시 실행하세요.")
     new_root = extract(archive)

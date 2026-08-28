@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller 스펙 — macOS(.app) / Windows / Linux 공용 onedir 빌드."""
+"""PyInstaller 스펙 — macOS(.app 번들) / Linux 는 onedir, Windows 는 단일 exe(onefile) 빌드."""
 import sys
 from pathlib import Path
 
@@ -38,18 +38,33 @@ pyz = PYZ(a.pure)
 
 icon = str(ROOT / "assets" / ("icon.ico" if sys.platform == "win32" else "icon.png"))
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    exclude_binaries=True,
-    name="catmoa",
-    debug=False,
-    strip=False,
-    upx=False,
-    console=False,
-    icon=icon,
-)
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="catmoa")
+if sys.platform == "win32":
+    # 단일 실행 파일: 다운로드 즉시 실행. (기동 시 임시 폴더에 풀리므로 첫 화면까지 수 초 걸림)
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.datas,
+        name="catmoa",
+        debug=False,
+        strip=False,
+        upx=False,
+        console=False,
+        icon=icon,
+    )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        exclude_binaries=True,
+        name="catmoa",
+        debug=False,
+        strip=False,
+        upx=False,
+        console=False,
+        icon=icon,
+    )
+    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="catmoa")
 
 if sys.platform == "darwin":
     app = BUNDLE(

@@ -19,9 +19,11 @@ def test_version_compare():
 
 def test_asset_name_matches_build_naming():
     name = updater.asset_name_for_platform()
-    assert name.startswith("catmoa-") and name.endswith((".zip", ".tar.gz"))
+    assert name.startswith("catmoa-") and name.endswith((".dmg", ".exe", ".tar.gz"))
     if platform.system() == "Darwin":
-        assert name == f"catmoa-macos-{'arm64' if platform.machine() == 'arm64' else 'x86_64'}.zip"
+        assert name == f"catmoa-macos-{'arm64' if platform.machine() == 'arm64' else 'x86_64'}.dmg"
+    elif platform.system() == "Windows":
+        assert name == "catmoa-windows-x86_64.exe"
 
 
 def _release(tag, assets=None):
@@ -75,6 +77,35 @@ def test_extract_zip_and_tar(tmp_path):
     with tarfile.open(t, "w:gz") as tf:
         tf.add(src, arcname="catmoa")
     assert (updater.extract(t) / "catmoa").read_text() == "bin"
+
+
+def test_extract_exe_returns_file_itself(tmp_path):
+    exe = tmp_path / "catmoa-windows-x86_64.exe"; exe.write_bytes(b"MZ")
+    assert updater.extract(exe) == exe
+
+
+@pytest.mark.skipif(platform.system() != "Darwin", reason="hdiutil 은 macOS 전용")
+def test_extract_dmg(tmp_path):
+    import subprocess
+    src = tmp_path / "stage" / "catmoa.app" / "Contents" / "MacOS"; src.mkdir(parents=True)
+    (src / "catmoa").write_text("bin")
+    dmg = tmp_path / "catmoa-macos-arm64.dmg"
+    subprocess.check_call(["hdiutil", "create", "-volname", "catmoa", "-srcfolder", str(tmp_path / "stage"),
+                           "-format", "UDZO", "-quiet", str(dmg)])
+    app = updater.extract(dmg)
+    assert app.name == "catmoa.app" and (app / "Contents" / "MacOS" / "catmoa").read_text() == "bin"
+    assert not (tmp_path / "mnt").exists() or not any((tmp_path / "mnt").iterdir())  # 마운트 해제됨
+
+
+def test_swap_script_single_exe(tmp_path, monkeypatch):
+    monkeypatch.setattr(updater.platform, "system", lambda: "Windows")
+    new = tmp_path / "dl" / "catmoa-windows-x86_64.exe"; new.parent.mkdir(); new.write_bytes(b"MZ")
+    target = tmp_path / "Downloads" / "catmoa.exe"
+    cmd, script = updater.make_swap_script(new, target, 777, tmp_path)
+    text = script.read_text(encoding="utf-8")
+    assert cmd[0] == "cmd" and "tasklist" in text and "777" in text
+    assert f'move /y "{new}" "{target}"' in text and f'start "" "{target}"' in text
+    assert "rmdir" not in text and f'del /f /q "{target}.old"' in text
 
 
 def test_swap_script_generation(tmp_path):

@@ -116,7 +116,7 @@
 ### FR-8 배포
 | 코드 | 요구사항 |
 |---|---|
-| FR-8.1 | PyInstaller onedir 빌드, OS별 아이콘 |
+| FR-8.1 | PyInstaller 빌드 — macOS .app→dmg, Windows 단일 exe(onefile), Linux onedir→tar.gz. OS별 아이콘 |
 | FR-8.2 | GitHub Actions 매트릭스 (macos-latest, ubuntu-latest, windows-latest), 태그 push 시 Release 생성 및 산출물 첨부 |
 | FR-8.3 | Secrets `CATMOA_GOOGLE_CLIENT_ID`, `CATMOA_GOOGLE_CLIENT_SECRET` → 빌드 시 `src/_secrets.py` 생성 (git 제외) |
 
@@ -191,6 +191,7 @@ class ScheduleItem(BaseModel):   # LLM 출력 단위
 | D10 | 패키지명 `pipeline`, `gsync` | `queue`, `google` | stdlib·google 네임스페이스 충돌 회피 |
 | D11 | Python 3.12 빌드 | 3.13 | 3-OS wheel 가용성이 가장 안정적 |
 | D12 | 자동 업데이트 = GitHub Releases 조회 + 외부 교체 스크립트 | 인스톨러/서명 프레임워크 | 서버 없이 동작. 실행 중 바이너리는 자기 교체 불가 → 종료 대기 스크립트가 폴더 교체·재실행. frozen 에서만 설치 |
+| D14 | 배포 형식: Windows 단일 exe + macOS dmg | onedir zip | 랜딩에서 클릭 즉시 실행 파일. exe 는 기동 시 임시 해제로 수 초 느리지만 교사 사용자에게 "압축 풀기" 단계 제거가 더 중요. .app 은 폴더라 dmg 컨테이너 필요. ≤1.3.0 클라이언트는 zip 자산을 못 찾아 릴리스 페이지 안내로 폴백 |
 | D13 | Upstage 이미지 입력은 Document Parse OCR 경유 | 비전 미지원으로 이미지 거부 | Solar 채팅은 이미지 불가. 한국어 OCR 품질이 좋아 공문 스캔에 오히려 유리 |
 | D14 | 📅+✅ 동시 등록 시 캘린더는 종일 "(마감)" 일정 + 알람 전날 17:00 | 09:00 타임 이벤트 | 마감은 종일 배너가 직관적. Google 종일 알림은 자정 기준이라 "N분 전"이 무의미 → 관례(전날 17:00) 고정. 시각이 있는 마감은 그 시각 + 사용자 N분 |
 | D15 | 태스크 카테고리 = Google Tasks 목록 | 앱 자체 태그 | 휴대폰 Tasks 앱에서 그대로 보이고, 사용자가 이미 만든 목록을 활용. 위젯 크기는 표정 프레임 최대치로 고정 |

@@ -3,7 +3,8 @@
 1. 환경변수 CATMOA_GOOGLE_CLIENT_ID / CATMOA_GOOGLE_CLIENT_SECRET (또는 .env) → src/_secrets.py 생성
 2. 아이콘 생성
 3. pyinstaller catmoa.spec
-4. dist/ 산출물을 OS별 압축 파일로 묶는다: catmoa-{macos|windows|linux}-{arch}.{zip|tar.gz}
+4. dist/ 산출물을 OS별 배포 파일로 만든다:
+   macOS → catmoa-macos-{arch}.dmg, Windows → catmoa-windows-{arch}.exe(단일 실행 파일), Linux → catmoa-linux-{arch}.tar.gz
 
 사용: python build.py [--no-archive]
 """
@@ -43,18 +44,31 @@ def run_pyinstaller() -> None:
     subprocess.check_call([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", str(ROOT / "catmoa.spec")], cwd=ROOT)
 
 
+def make_dmg(app: Path, out: Path) -> None:
+    """catmoa.app + /Applications 바로가기를 담은 압축 dmg (더블클릭 → 드래그 설치)."""
+    staging = out.parent / "dmg_staging"
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir()
+    subprocess.check_call(["ditto", str(app), str(staging / app.name)])
+    (staging / "Applications").symlink_to("/Applications")
+    out.unlink(missing_ok=True)
+    subprocess.check_call(["hdiutil", "create", "-volname", "catmoa", "-srcfolder", str(staging),
+                           "-ov", "-format", "UDZO", "-quiet", str(out)])
+    shutil.rmtree(staging, ignore_errors=True)
+
+
 def archive() -> Path:
     sysname = platform.system()
     arch = platform.machine().lower()
     arch = {"amd64": "x86_64", "x86_64": "x86_64", "arm64": "arm64", "aarch64": "arm64"}.get(arch, arch)
     dist = ROOT / "dist"
     if sysname == "Darwin":
-        app = dist / "catmoa.app"
-        out = dist / f"catmoa-macos-{arch}.zip"
-        subprocess.check_call(["ditto", "-c", "-k", "--keepParent", str(app), str(out)])
+        out = dist / f"catmoa-macos-{arch}.dmg"
+        make_dmg(dist / "catmoa.app", out)
     elif sysname == "Windows":
-        out = dist / f"catmoa-windows-{arch}.zip"
-        shutil.make_archive(str(out.with_suffix("")), "zip", root_dir=dist, base_dir="catmoa")
+        # onefile 빌드 → dist/catmoa.exe 하나. 이름만 배포용으로 바꾼다
+        out = dist / f"catmoa-windows-{arch}.exe"
+        shutil.copy2(dist / "catmoa.exe", out)
     else:
         out = dist / f"catmoa-linux-{arch}.tar.gz"
         shutil.make_archive(str(out).replace(".tar.gz", ""), "gztar", root_dir=dist, base_dir="catmoa")
