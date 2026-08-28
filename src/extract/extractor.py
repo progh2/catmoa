@@ -46,7 +46,7 @@ class Extractor:
                 kind_rules: str = "", category_rules: str = "",
                 categories: list[str] | tuple[str, ...] = (),
                 drop_before: date | None = None, persona: str = "", skip_irrelevant: bool = True,
-                timetable: str = "", source_chars: int = 1500) -> ExtractionResult:
+                timetable: str = "", source_chars: int = 1500, mask_pii: bool = True) -> ExtractionResult:
         """drop_before: 이 날짜보다 앞선 항목은 버린다 (예: 쪽지 수신일 이전의 지나간 일정).
         persona: 사용자 역할. 주어지면 scope(관련성)를 판정하고, skip_irrelevant 면 무관한 내용은 항목을 비운다."""
         ref = ref or date.today()
@@ -65,9 +65,23 @@ class Extractor:
         if images and self.provider.supports_vision_default is False:
             warnings.append("선택한 모델은 이미지를 지원하지 않을 수 있습니다.")
 
+        # LLM 에 보내는 텍스트만 개인정보 마스킹 (원문 source_text 는 그대로). 토큰은 결과에서 복원.
+        mapping: dict[str, str] = {}
+        llm_text = text
+        if mask_pii and text:
+            from src.privacy import mask_text
+
+            mr = mask_text(text)
+            llm_text, mapping = mr.masked, mr.mapping
+            if mr.count:
+                log.info("PII 마스킹 %d곳 (%s)%s", mr.count, mr.summary(), " +모델" if mr.used_model else "")
+                warnings.append(f"🔒 개인정보 {mr.count}곳을 가리고 AI에 보냈어요 ({mr.summary()})")
+            if images:
+                warnings.append("이미지 속 개인정보는 가릴 수 없어 그대로 전송됩니다.")
+
         req = LLMRequest(
             system=SYSTEM_PROMPT,
-            text=user_prompt(text, ref, source, has_images=bool(images), **prompt_opts),
+            text=user_prompt(llm_text, ref, source, has_images=bool(images), **prompt_opts),
             images=images,
             json_mode=True,
             max_tokens=4096,
@@ -86,7 +100,7 @@ class Extractor:
                 raise ExtractionError(f"모델 응답을 해석할 수 없습니다: {e}") from e
 
         items, skipped = _to_items(data, ref, source)
-        if not items and text and _REQUEST_CUE_RE.search(text):
+        if not items and llm_text and _REQUEST_CUE_RE.search(llm_text):
             # 모델이 놓친 '날짜 없는 요청' — 요청 표현이 있으면 task 로 한 번 더 요청
             log.info("요청 표현 있음, task 추출 재요청")
             req3 = LLMRequest(system=SYSTEM_PROMPT, text=req.text + "\n\n" + REQUEST_RETRY_HINT,
@@ -107,6 +121,15 @@ class Extractor:
                 items = [i for i in items if i.undated or i.start.date() >= drop_before]
                 warnings.append(f"{drop_before:%m/%d} 이전의 지나간 항목 {len(past)}개를 제외했습니다: "
                                 + ", ".join(i.title[:20] for i in past[:3]))
+
+        # 마스킹 토큰이 결과에 남았으면 원문으로 복원 (제목·메모·장소·카테고리)
+        if mapping:
+            from src.privacy import restore_text
+
+            for it in items:
+                it.title = restore_text(it.title, mapping) or it.title
+                it.notes = restore_text(it.notes, mapping)
+                it.location = restore_text(it.location, mapping)
 
         # 원문 발췌를 항목에 실어 캘린더 설명/태스크 메모에서 참고할 수 있게
         if source_chars > 0:

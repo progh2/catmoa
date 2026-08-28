@@ -328,6 +328,19 @@ class SettingsDialog(QDialog):
         lay = QVBoxLayout(w)
         s = self.config.schedule
 
+        from src.privacy import model_available
+
+        self.mask_pii = QCheckBox("🔒 AI에 보내기 전에 개인정보 가리기 (이름·전화·이메일·주민번호·주소·학번 등 → [이름1] 식 토큰)")
+        self.mask_pii.setChecked(s.mask_pii)
+        self.mask_pii.setToolTip("PC 안에서 규칙으로 가리고, AI 결과에 남은 토큰은 원문으로 복원합니다. "
+                                 "캘린더 메모·태스크 하단의 원문은 가리지 않습니다. 이미지 속 글자는 가릴 수 없습니다.")
+        lay.addWidget(self.mask_pii)
+        mask_note = QLabel("규칙 기반 마스킹 내장" + (" + 로컬 AI 모델(schift-ko-pii-v6) 사용 중" if model_available()
+                           else " · 문맥형 인명 탐지 모델(schift-ko-pii-v6)은 선택 설치 (README 참고)"))
+        mask_note.setStyleSheet("color: palette(mid); font-size: 11px;")
+        mask_note.setWordWrap(True)
+        lay.addWidget(mask_note)
+
         lay.addWidget(QLabel("<b>👤 내 역할</b> — 쪽지·공문이 <i>내</i> 업무인지 판단하는 기준. 비워두면 판정하지 않습니다."))
         self.persona = QLineEdit(s.persona)
         self.persona.setPlaceholderText("예) 중학교 2학년 3반 담임, 정보 교과, 정보부 (에듀테크 담당)")
@@ -787,6 +800,7 @@ class SettingsDialog(QDialog):
         s.category_rules = self.category_rules.toPlainText().strip()
         s.persona = self.persona.text().strip()
         s.skip_irrelevant = self.skip_irrelevant.isChecked()
+        s.mask_pii = self.mask_pii.isChecked()
         if self.autostart.isChecked() != self._autostart_initial:
             try:
                 autostart.set_enabled(self.autostart.isChecked())

@@ -49,6 +49,7 @@ class ScheduleSettings:
     default_target: str = "auto"        # auto | calendar | task | both
     kind_rules: str = ""                # 사용자 분류 규칙 (캘린더 vs 태스크)
     category_rules: str = ""            # 사용자 태스크 카테고리(목록) 규칙
+    mask_pii: bool = True               # LLM 전송 전 개인정보 마스킹 (원문 메모는 그대로)
     persona: str = ""                   # 내 역할 (예: "중학교 2학년 담임, 정보 교과, 정보부") — 관련성 판정 기준
     skip_irrelevant: bool = True        # 내 업무와 무관하다고 판단되면 등록 제안하지 않음
     alarm_enabled: bool = True

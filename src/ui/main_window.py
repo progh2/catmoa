@@ -91,7 +91,7 @@ class AppController:
                 "categories": [name for _, name in self.tasklists],
                 "persona": s.persona, "skip_irrelevant": s.skip_irrelevant,
                 "timetable": self.config.teacher.describe(),
-                "source_chars": s.source_text_chars}
+                "source_chars": s.source_text_chars, "mask_pii": s.mask_pii}
 
     def refresh_tasklists(self) -> None:
         if not self.google.is_logged_in():

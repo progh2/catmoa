@@ -27,6 +27,9 @@ tests/_tmp/
 # 고양이 원본 이미지 (1254px, 수 MB) — 배포용은 tools/prepare_cat.py 로 assets/cat/ 에 생성
 assets/cat-src/
 
+# 사용자가 참고용으로 넣은 외부 소스/모델 zip (저장소에 올리지 않음)
+*.zip
+
 # OS / IDE
 .DS_Store
 Thumbs.db
