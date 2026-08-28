@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from src.gsync.dedupe import DupMatch
@@ -35,40 +35,60 @@ class DedupeDialog(QDialog):
         lay.addLayout(bulk)
 
         body = QWidget()
-        grid = QGridLayout(body)
-        grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(2, 1)
-        grid.addWidget(QLabel("<b>새 항목</b>"), 0, 1)
-        grid.addWidget(QLabel("<b>기존 항목</b>"), 0, 2)
-        grid.addWidget(QLabel("<b>처리</b>"), 0, 3)
-        for i, m in enumerate(matches, 1):
+        body_lay = QVBoxLayout(body)
+        body_lay.setContentsMargins(4, 4, 4, 4)
+        body_lay.setSpacing(12)
+        for m in matches:
+            card = QFrame(objectName="dupCard")
+            card.setStyleSheet("#dupCard { background: palette(base); border: 1px solid palette(mid); border-radius: 10px; }")
+            row = QHBoxLayout(card)
+            row.setContentsMargins(14, 12, 14, 12)
+            row.setSpacing(18)
+
             icon = QLabel(TARGET_ICON.get(m.target, ""))
-            new = QLabel(f"{m.decision.item.title}<br><span style='color:gray'>{m.decision.item.describe_when()}</span>")
+            icon.setStyleSheet("font-size: 20px;")
+            icon.setFixedWidth(28)
+
+            new = QLabel(f"<span style='color:gray;font-size:11px'>새 항목</span><br>"
+                         f"<b>{m.decision.item.title}</b><br>"
+                         f"<span style='color:gray'>{m.decision.item.describe_when()}</span>")
             new.setTextFormat(Qt.TextFormat.RichText)
             new.setWordWrap(True)
-            old_txt = f"{m.title}<br><span style='color:gray'>{m.when} · 유사도 {int(m.score * 100)}%</span>"
+
+            arrow = QLabel("≈")
+            arrow.setStyleSheet("font-size: 18px; color: palette(mid);")
+            arrow.setFixedWidth(20)
+            arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            old_txt = (f"<span style='color:gray;font-size:11px'>이미 등록된 항목 · 유사도 {int(m.score * 100)}%</span><br>"
+                       f"<b>{m.title}</b><br><span style='color:gray'>{m.when}</span>")
             if m.link:
-                old_txt += f" <a href='{m.link}'>열기</a>"
+                old_txt += f" &nbsp;<a href='{m.link}'>열기</a>"
             old = QLabel(old_txt)
             old.setTextFormat(Qt.TextFormat.RichText)
             old.setOpenExternalLinks(True)
             old.setWordWrap(True)
+
             combo = QComboBox()
             for key, label in CHOICES:
                 combo.addItem(label, key)
             combo.setCurrentIndex(0)
+            combo.setMinimumWidth(230)
             self.combos.append(combo)
-            grid.addWidget(icon, i, 0)
-            grid.addWidget(new, i, 1)
-            grid.addWidget(old, i, 2)
-            grid.addWidget(combo, i, 3)
-            line = QFrame()
-            line.setFrameShape(QFrame.Shape.HLine)
-            grid.addWidget(line, i, 0, 1, 4, Qt.AlignmentFlag.AlignBottom)
+
+            row.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+            row.addWidget(new, 1)
+            row.addWidget(arrow, 0, Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(old, 1)
+            row.addWidget(combo, 0, Qt.AlignmentFlag.AlignVCenter)
+            body_lay.addWidget(card)
+        body_lay.addStretch(1)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setWidget(body)
         lay.addWidget(scroll, 1)
+        self.resize(820, min(180 + 110 * len(matches), 640))
 
         foot = QHBoxLayout()
         foot.addStretch(1)
