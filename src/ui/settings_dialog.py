@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -73,13 +74,15 @@ def default_coolm_dir() -> str:
 class SettingsDialog(QDialog):
     saved = Signal(object)   # cfg.Config
 
-    TAB_INDEX = {"llm": 0, "general": 1, "google": 2, "coolm": 3, "update": 4}
+    TAB_INDEX = {"llm": 0, "general": 1, "rules": 2, "google": 3, "coolm": 4, "update": 5}
 
     def __init__(self, config: cfg.Config, google_auth: GoogleAuthLike | None = None, parent: QWidget | None = None,
-                 *, initial_tab: str | None = None, update_info=None, quit_callback: Callable[[], None] | None = None):
+                 *, initial_tab: str | None = None, update_info=None, quit_callback: Callable[[], None] | None = None,
+                 tasklists: list[tuple[str, str]] | None = None):
         super().__init__(parent)
         self.config = config
         self.google = google_auth
+        self._tasklists = list(tasklists or [])
         self._tasks: list[_Task] = []
         self._update_info = update_info
         self._update_archive = None
@@ -90,6 +93,7 @@ class SettingsDialog(QDialog):
         tabs = self.tabs = QTabWidget()
         tabs.addTab(self._build_llm(), "LLM")
         tabs.addTab(self._build_general(), "일반")
+        tabs.addTab(self._build_rules(), "분류 규칙")
         tabs.addTab(self._build_google(), "Google")
         tabs.addTab(self._build_coolm(), "쿨메신저")
         tabs.addTab(self._build_update(), "업데이트")
@@ -163,6 +167,14 @@ class SettingsDialog(QDialog):
     def _current_provider_key(self) -> str:
         return self.provider.currentData()
 
+    def _model_id(self) -> str:
+        """모델 콤보의 실제 모델 id. 목록에서 고른 항목은 itemData, 직접 입력한 값은 '(비전)' 태그를 벗겨 반환."""
+        typed = self.model.currentText().strip()
+        idx = self.model.currentIndex()
+        if idx >= 0 and self.model.itemText(idx) == typed and self.model.itemData(idx):
+            return self.model.itemData(idx)
+        return re.sub(r"\s*\((?:비전|vision)\)\s*$", "", typed, flags=re.I)
+
     def _on_provider_changed(self, *_):
         key = self._current_provider_key()
         is_ollama = key == "ollama"
@@ -177,7 +189,7 @@ class SettingsDialog(QDialog):
 
     def _make_provider(self):
         key = self._current_provider_key()
-        return create_provider(provider=key, model=self.model.currentText().strip(),
+        return create_provider(provider=key, model=self._model_id(),
                                api_key=self.api_key.text().strip(), ollama_url=self.ollama_url.text().strip())
 
     def _run(self, fn: Callable, on_done: Callable, on_error: Callable):
@@ -199,7 +211,7 @@ class SettingsDialog(QDialog):
             return
 
         def done(models):
-            cur = self.model.currentText().strip()
+            cur = self._model_id()
             self.model.clear()
             for m in models:
                 tag = " (비전)" if m.vision else ""
@@ -243,9 +255,11 @@ class SettingsDialog(QDialog):
         form = QFormLayout(w)
         s = self.config.schedule
         self.default_target = QComboBox()
-        for key, label in (("auto", "AI가 제안 (일정/할 일 자동)"), ("calendar", "항상 📅 캘린더"), ("task", "항상 ✅ 태스크")):
+        for key, label in (("auto", "AI가 제안 (일정/할 일 자동)"), ("calendar", "항상 📅 캘린더"),
+                           ("task", "항상 ✅ 태스크"), ("both", "항상 📅+✅ 둘 다 (캘린더=마감일, 태스크=할 일)")):
             self.default_target.addItem(label, key)
-        self.default_target.setCurrentIndex(("auto", "calendar", "task").index(s.default_target) if s.default_target in ("auto", "calendar", "task") else 0)
+        keys = ("auto", "calendar", "task", "both")
+        self.default_target.setCurrentIndex(keys.index(s.default_target) if s.default_target in keys else 0)
         form.addRow("기본 대상", self.default_target)
 
         self.alarm_enabled = QCheckBox("기본으로 알람 켜기")
@@ -486,10 +500,7 @@ class SettingsDialog(QDialog):
         c = self.config
         key = self._current_provider_key()
         c.llm.provider = key
-        idx = self.model.currentIndex()
-        data = self.model.itemData(idx) if idx >= 0 else None
-        typed = self.model.currentText().strip()
-        c.llm.model = data if (data and self.model.itemText(idx) == typed) else typed.split(" (")[0]
+        c.llm.model = self._model_id()
         c.llm.ollama_url = self.ollama_url.text().strip() or "http://localhost:11434"
         if key in SECRET_FOR_PROVIDER:
             secret = SECRET_FOR_PROVIDER[key]

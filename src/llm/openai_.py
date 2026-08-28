@@ -10,9 +10,12 @@ DEFAULT_MODEL = "gpt-4o"
 
 # 채팅에 쓸 수 없는 모델 제외 (임베딩, tts, whisper, dall-e, moderation, realtime, 이미지 생성 등)
 _EXCLUDE_RE = re.compile(
-    r"embedding|tts|whisper|dall-e|moderation|realtime|audio|transcribe|image|search|instruct|babbage|davinci|computer-use",
+    r"embedding|tts|whisper|dall-e|moderation|realtime|audio|transcribe|image|search|instruct|babbage|davinci|computer-use"
+    r"|-pro\b|codex|deep-research",  # Responses API 전용 (chat.completions 에서 404)
     re.I,
 )
+# 추론 모델: 응답 토큰을 사고 과정이 먼저 소비하므로 max_completion_tokens 가 작으면 본문이 비어 온다
+_REASONING_RE = re.compile(r"^(o[1-9]|gpt-5)", re.I)
 _VISION_RE = re.compile(r"^(gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-5|o1(?!-mini)|o3|o4|chatgpt-4o)", re.I)
 
 
@@ -63,7 +66,7 @@ class OpenAIProvider(LLMProvider):
                     {"role": "system", "content": system},
                     {"role": "user", "content": parts},
                 ],
-                max_completion_tokens=req.max_tokens,
+                max_completion_tokens=max(req.max_tokens, 4096) if _REASONING_RE.match(self.model) else req.max_tokens,
                 **kwargs,
             )
         except Exception as e:  # noqa: BLE001
