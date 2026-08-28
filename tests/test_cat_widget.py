@@ -92,7 +92,7 @@ def test_size_stable_on_hover_and_badges(widget, app):
     from PySide6.QtGui import QEnterEvent
     widget.enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
     app.processEvents()
-    assert not widget.gear.isHidden() and (widget.width(), widget.height()) == base
+    assert not hasattr(widget, "gear") and (widget.width(), widget.height()) == base   # ⚙ 없음 (설정은 우클릭)
     widget.set_queue_size(9)
     widget.set_update_available("9.9.9")
     app.processEvents()

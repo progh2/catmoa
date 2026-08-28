@@ -62,17 +62,12 @@ class CatWidget(QWidget):
         top.setContentsMargins(6, 0, 6, 0)
         self.badge = QLabel("", objectName="badge")
         self.badge.hide()
-        self.gear = QLabel("⚙", objectName="gear")
-        self.gear.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.gear.setToolTip("설정")
-        self.gear.hide()
-        self.gear.mousePressEvent = lambda e: self.settings_requested.emit()  # type: ignore[assignment]
         self.update_badge = QLabel("⬆", objectName="updateBadge")
         self.update_badge.setCursor(Qt.CursorShape.PointingHandCursor)
         self.update_badge.hide()
         self.update_badge.mousePressEvent = lambda e: self.update_requested.emit()  # type: ignore[assignment]
         # 숨겨져 있어도 자리를 차지하게 → 호버/배지 표시 때 창 크기가 변하지 않는다
-        for w in (self.badge, self.update_badge, self.gear):
+        for w in (self.badge, self.update_badge):
             sp = w.sizePolicy()
             sp.setRetainSizeWhenHidden(True)
             w.setSizePolicy(sp)
@@ -80,7 +75,6 @@ class CatWidget(QWidget):
         top.addWidget(self.badge)
         top.addStretch(1)
         top.addWidget(self.update_badge)
-        top.addWidget(self.gear)
 
         self.face = QLabel(objectName="catFace")
         self.face.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -93,8 +87,8 @@ class CatWidget(QWidget):
         root.addLayout(top)
         root.addWidget(self.face)
         # 위 줄(배지/⚙) 높이를 고정하고 창 전체를 고정 크기로 잠근다
-        top_h = max(self.badge.sizeHint().height(), self.gear.sizeHint().height(), self.update_badge.sizeHint().height())
-        for w in (self.badge, self.update_badge, self.gear):
+        top_h = max(self.badge.sizeHint().height(), self.update_badge.sizeHint().height())
+        for w in (self.badge, self.update_badge):
             w.setFixedHeight(top_h)
         self.badge.setText("")
         # face 는 _fix_face_size 에서 setFixedSize 됨 → 레이아웃 전이라도 minimumWidth/Height 가 확정값
@@ -205,7 +199,6 @@ class CatWidget(QWidget):
 
     # ------------------------------------------------------------ 마우스 / 이동
     def enterEvent(self, event) -> None:
-        self.gear.show()
         if not self._busy and self._state in ("idle", "sleeping"):
             self._enter("hover")
         # 호버 중 ⌘V 를 받기 위해 포커스 획득
@@ -214,7 +207,6 @@ class CatWidget(QWidget):
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
-        self.gear.hide()
         if self._state == "hover":
             self._enter("idle")
         super().leaveEvent(event)
