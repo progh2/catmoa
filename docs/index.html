@@ -9,8 +9,9 @@
 <meta property="og:description" content="흩어진 일정 자료를 고양이에게 던지면 AI가 Google 캘린더/Tasks에 넣어줍니다.">
 <meta property="og:image" content="https://progh2.github.io/catmoa/icon.png">
 <meta property="og:type" content="website">
-<link rel="icon" href="icon.png">
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="favicon.ico?v=3" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" href="icon.png?v=3" sizes="512x512">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
   :root {
@@ -387,14 +388,23 @@ run.cmd       # Windows</pre>
     eating: ["cat/eating_1.png", "cat/eating_2.png"],
     happy:  ["cat/happy.png"],
     hover:  ["cat/hover.png"],
+    hover_tl: ["cat/hover_tl.png"], hover_tr: ["cat/hover_tr.png"],
+    hover_bl: ["cat/hover_bl.png"], hover_br: ["cat/hover_br.png"],
   };
   Object.values(FACES).flat().forEach(src => { const i = new Image(); i.src = src; });   // 미리 로드
   const cat = document.getElementById("cat"), tip = document.getElementById("tip");
-  let state = "idle", frame = 0, hovering = false;
+  let state = "idle", frame = 0, hovering = false, hoverDir = "hover";
   setInterval(() => {
-    const f = FACES[hovering ? "hover" : state], src = f[frame++ % f.length];
+    const f = FACES[hovering ? hoverDir : state], src = f[frame++ % f.length];
     if (!cat.src.endsWith(src)) cat.src = src;
   }, 450);
+  // 앱과 같은 동작: 마우스가 고양이의 어느 사분면에 있는지 보고 시선을 돌린다
+  cat.addEventListener("mousemove", (e) => {
+    const r = cat.getBoundingClientRect();
+    const v = e.clientY < r.top + r.height / 2 ? "t" : "b", h = e.clientX < r.left + r.width / 2 ? "l" : "r";
+    const d = "hover_" + v + h;
+    if (d !== hoverDir) { hoverDir = d; if (hovering) cat.src = FACES[d][0]; }
+  });
   // 6초 주기: 음식이 도착(≈2.7s)하면 먹고 → 기뻐하고 → 다시 idle
   function cycle() {
     setTimeout(() => { state = "eating"; cat.classList.add("eat"); }, 2600);

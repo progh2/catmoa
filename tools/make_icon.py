@@ -82,7 +82,9 @@ def main() -> None:
     docs_icon = ROOT / "docs" / "icon.png"
     if docs_icon.parent.exists():
         im.resize((512, 512), Image.LANCZOS).save(docs_icon)   # 랜딩 페이지 로고/og:image
-    print("wrote", OUT / "icon.png", OUT / "icon.ico", docs_icon)
+        im.resize((180, 180), Image.LANCZOS).save(docs_icon.parent / "apple-touch-icon.png")
+        im.save(docs_icon.parent / "favicon.ico", sizes=[(48, 48), (32, 32), (16, 16)])
+    print("wrote", OUT / "icon.png", OUT / "icon.ico", docs_icon, "favicon.ico, apple-touch-icon.png")
 
 
 if __name__ == "__main__":
