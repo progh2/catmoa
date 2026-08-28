@@ -101,7 +101,13 @@ class SettingsDialog(QDialog):
         self._update_archive = None
         self._quit = quit_callback or (lambda: QApplication.instance().quit())
         self.setWindowTitle("catmoa 설정")
-        self.setMinimumWidth(560)
+        # 제목표시줄에 최대화(전체화면) 버튼을 붙인다 — 기본 QDialog 에는 닫기만 있다
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window
+                            | Qt.WindowType.WindowMinMaxButtonsHint | Qt.WindowType.WindowCloseButtonHint)
+        self.setSizeGripEnabled(True)
+        self._enlarge_font()
+        self.setMinimumWidth(620)
+        self.resize(760, 620)
 
         tabs = self.tabs = QTabWidget()
         tabs.addTab(self._build_llm(), "LLM")
@@ -124,6 +130,28 @@ class SettingsDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.addWidget(tabs)
         lay.addWidget(buttons)
+
+    # ------------------------------------------------------------ 가독성
+    FONT_SCALE = 1.15          # 50~60대 선생님도 편하게 — 시스템 기본 글자보다 살짝 크게
+
+    def _enlarge_font(self) -> None:
+        """설정 창 전체 글자를 조금 키운다 (자식 위젯이 모두 상속)."""
+        f = self.font()
+        if f.pointSizeF() > 0:
+            f.setPointSizeF(round(f.pointSizeF() * self.FONT_SCALE, 1))
+        else:                                    # 픽셀 단위로 잡힌 환경
+            f.setPixelSize(max(13, int(f.pixelSize() * self.FONT_SCALE)))
+        self.setFont(f)
+
+    def toggle_maximized(self) -> None:
+        """전체화면 ↔ 원래 크기 (키보드 F11 / 제목표시줄 최대화 버튼과 같은 동작)."""
+        self.showNormal() if self.isMaximized() else self.showMaximized()
+
+    def keyPressEvent(self, e) -> None:
+        if e.key() == Qt.Key.Key_F11:
+            self.toggle_maximized()
+            return
+        super().keyPressEvent(e)
 
     # ------------------------------------------------------------ 고양이 크기 실시간 반영
     def _on_scale_changed(self, v: int) -> None:
@@ -197,7 +225,7 @@ class SettingsDialog(QDialog):
                       "외부 전송이 걱정되면 Ollama(로컬)를 선택하세요. 이미지 분석에는 비전 지원 모델이 필요합니다 "
                       "(Solar는 Upstage 문서 인식(OCR)을 거쳐 이미지를 읽습니다).")
         note.setWordWrap(True)
-        note.setStyleSheet("color: palette(mid); font-size: 11px;")
+        note.setStyleSheet("color: palette(mid); font-size: 13px;")
         form.addRow(note)
 
         self._on_provider_changed()
@@ -346,7 +374,7 @@ class SettingsDialog(QDialog):
         srow.addWidget(b_reset)
         form.addRow("고양이 크기", srow)
         hint = QLabel("슬라이더를 움직이면 고양이가 바로 커지고 작아져요. 취소하면 원래 크기로 돌아갑니다.")
-        hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        hint.setStyleSheet("color: palette(mid); font-size: 13px;")
         hint.setWordWrap(True)
         form.addRow("", hint)
 
@@ -397,7 +425,7 @@ class SettingsDialog(QDialog):
         row = QHBoxLayout()
         self.tasklist_names = QLabel()
         self.tasklist_names.setWordWrap(True)
-        self.tasklist_names.setStyleSheet("color: palette(mid); font-size: 11px;")
+        self.tasklist_names.setStyleSheet("color: palette(mid); font-size: 13px;")
         self._show_tasklist_names()
         b = QPushButton("목록 새로고침")
         b.clicked.connect(self._reload_tasklists)
@@ -460,7 +488,7 @@ class SettingsDialog(QDialog):
                          if model_available() else
                          ", 문맥형 인명 탐지 모델(schift-ko-pii-v6)은 선택 설치입니다 (README 참고).")
                       + "<br>캘린더 설명·태스크 메모에 들어가는 <b>원문은 가리지 않습니다</b> (나중에 확인해야 하니까요).")
-        note.setStyleSheet("color: palette(mid); font-size: 11px;")
+        note.setStyleSheet("color: palette(mid); font-size: 13px;")
         note.setWordWrap(True)
         lay.addWidget(note)
 
@@ -562,7 +590,7 @@ class SettingsDialog(QDialog):
         grid.addWidget(btn, 0, Qt.AlignmentFlag.AlignBottom)
         form.addRow("교시 시작", grid)
         tip = QLabel("1교시를 고치면 2~4교시가, 5교시를 고치면 6~7교시가 수업·쉬는 시간에 맞춰 따라옵니다.")
-        tip.setStyleSheet("color: palette(mid); font-size: 11px;")
+        tip.setStyleSheet("color: palette(mid); font-size: 13px;")
         tip.setWordWrap(True)
         form.addRow("", tip)
 
@@ -579,7 +607,7 @@ class SettingsDialog(QDialog):
 
         self.tt_preview = QLabel()
         self.tt_preview.setWordWrap(True)
-        self.tt_preview.setStyleSheet("color: palette(mid); font-size: 11px;")
+        self.tt_preview.setStyleSheet("color: palette(mid); font-size: 13px;")
         lay.addWidget(self.tt_preview)
         lay.addStretch(1)
         for wdg in (self.tt_work_start, self.tt_work_end, self.tt_lunch_start, self.tt_lunch_end):
@@ -735,7 +763,7 @@ class SettingsDialog(QDialog):
         if not self._coolm_is_windows:
             note_os = QLabel("이 기능은 Windows의 쿨메신저용입니다. macOS/Linux에서는 아래에 udb 폴더를 직접 지정한 경우(테스트용)에만 켤 수 있습니다.")
             note_os.setWordWrap(True)
-            note_os.setStyleSheet("color: palette(mid); font-size: 11px;")
+            note_os.setStyleSheet("color: palette(mid); font-size: 13px;")
             lay.addWidget(note_os)
 
         box = QGroupBox()
@@ -800,7 +828,7 @@ class SettingsDialog(QDialog):
         note = QLabel("쪽지 DB는 읽기 전용 복사본으로만 접근하며 원본은 수정하지 않습니다. "
                       "다만 쪽지 <b>본문이 LLM으로 전송</b>됩니다 — 외부 전송이 걱정되면 LLM 탭에서 Ollama(로컬)를 선택하세요.")
         note.setWordWrap(True)
-        note.setStyleSheet("color: palette(mid); font-size: 11px;")
+        note.setStyleSheet("color: palette(mid); font-size: 13px;")
         lay.addWidget(note)
         lay.addStretch(1)
         return w

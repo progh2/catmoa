@@ -125,3 +125,31 @@ def test_settings_google_disabled_without_auth(app):
     dlg = SettingsDialog(cfg.Config())
     assert not dlg.btn_login.isEnabled() and "v0.3" in dlg.google_status.text()
     assert dlg.TAB_INDEX["update"] == dlg.tabs.count() - 1
+
+
+# ---------------------------------------------------------------- 설정 창 가독성/전체화면 (#56)
+
+def test_settings_maximize_button_and_bigger_font(app, tmp_path, monkeypatch):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+
+    from src.ui.settings_dialog import SettingsDialog
+
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
+    dlg = SettingsDialog(cfg.Config())
+    flags = dlg.windowFlags()
+    assert flags & Qt.WindowType.WindowMaximizeButtonHint          # 제목표시줄 최대화(전체화면) 버튼
+    assert flags & Qt.WindowType.WindowCloseButtonHint
+    assert dlg.isSizeGripEnabled()
+
+    base = QApplication.instance().font().pointSizeF()
+    if base > 0:
+        assert dlg.font().pointSizeF() > base                      # 기본보다 큰 글자
+    assert dlg.minimumWidth() >= 620
+
+    dlg.show()
+    dlg.toggle_maximized()
+    assert dlg.isMaximized()
+    dlg.toggle_maximized()
+    assert not dlg.isMaximized()
+    dlg.close()

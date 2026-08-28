@@ -12,7 +12,8 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.4.11 — 개인정보 마스킹(#48: src/privacy/{rules,masker}.py, Extractor(mask_pii=), 원문 source_text 는 마스킹 안 함, 설정 '분류 규칙' 탭 체크박스, 프롬프트 규칙 17), 검토창 얇게+체크박스(#49/#50: REVIEW_QSS, 350×228, chk_cal/chk_task + [다음 →]), 중복 실행 방지(#51: src/single_instance.py — instance.json(pid+version)+QLocalServer, 구버전이면 taskkill/SIGTERM 후 이어받기), 쿨메신저 '지금 확인' 실패 원인(#52)
+- intent: v1.4.12 — 고양이 크기 슬라이더 실시간 반영(#53: SettingsDialog(scale_preview=) + 120ms 디바운스, 취소 시 복원), 교시 자동 연쇄(#54: TeacherSettings.cascade/cascade_all/sync_lunch, 오전 1~4·오후 5~7 블록, 점심=4교시 종료~5교시 시작, lunch_auto), 설정 '개인정보' 탭(#55: 마스킹 on/off + '가려보기' 로 mask_text 실행·복원 왕복 검증, TAB_INDEX 재배치), 설정 창 최대화 버튼+글자 1.15배(#56)
+- (이전) v1.4.11 — 개인정보 마스킹(#48: src/privacy/{rules,masker}.py, Extractor(mask_pii=), 원문 source_text 는 마스킹 안 함, 설정 '분류 규칙' 탭 체크박스, 프롬프트 규칙 17), 검토창 얇게+체크박스(#49/#50: REVIEW_QSS, 350×228, chk_cal/chk_task + [다음 →]), 중복 실행 방지(#51: src/single_instance.py — instance.json(pid+version)+QLocalServer, 구버전이면 taskkill/SIGTERM 후 이어받기), 쿨메신저 '지금 확인' 실패 원인(#52)
 - **#52 원인**: `_run_bg` 의 콜백이 AppController(=QObject 아님)의 평범한 함수라 Qt 가 DirectConnection 으로 붙여 **워커 스레드에서 GUI 를 건드렸다**. `QTimer.singleShot(0, self.cat, ...)` 로 메인 스레드에 넘기도록 수정 + 폴더 없음은 실행 전에 걸러 설정으로 안내 + _Task 가 traceback 을 로그에 남김
 - (이전) v1.4.10 — 검토창 카드형 개편(#47): ReviewDialog 는 _Row(숨김 모델) 위의 카드 위저드(📅/✅/둘 다/건너뛰기/수정…/나머지 기본대로/이전, 요약 카드→등록, 단축키 1/2/3/S/E). EditDialog 는 _Row 를 붙였다 떼어냄(파괴 방지). 알람은 설정 기본값. v1.4.9 릴리스 완료
 - (이전) v1.4.9 — 고양이 크기 배율(#45: config.ui.cat_scale 0.5~3.0, cat_faces.load_cat_images(scale), CatWidget.set_scale/_lock_size, HairpinBadge.set_scale, 설정 일반 탭 QSlider). 랜딩 '놀아줘요' 카드(#44), README 아이콘(#43). v1.4.8 릴리스 완료
