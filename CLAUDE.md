@@ -12,7 +12,7 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v0.1~v0.4 완료(#1~#19), v1.0 배포 진행 (#20·#21 완료, #22 README/릴리스 남음)
-- changes_made: sources/coolm(리더+가짜 udb)·coolm_watcher, build.py·catmoa.spec·tools/make_icon.py·.github/workflows/build.yml. GitHub Pages 소개 페이지 docs/index.html (main /docs 소스, https://progh2.github.io/catmoa/ — 릴리스 API로 다운로드 링크 자동 갱신). 테스트 93개. 로컬 macOS arm64 빌드·실행 확인. CI workflow_dispatch 트리거함
-- decisions: 워커/워처는 cat 위젯을 parent로 (종료 시 QObject 소유권 경고 방지). 쿨메신저 쪽지의 기준일은 ReceiveDate. macOS 앱은 LSUIElement(Dock 숨김). 산출물명 catmoa-{macos-arm64|windows-x86_64|linux-x86_64}. **Google 실제 로그인/등록 미검증** — .env 필요
-- next_steps: CI 3-OS 빌드 결과 확인 → README 마무리 후 v1.0.0 태그 → Google 실검증(사용자 .env) → 검증 후 필요 시 fix
+- intent: v1.0.0 태그 push → Release 빌드 확인 → #22 종료
+- changes_made: 전 마일스톤 구현(#1~#21). GitHub Pages docs/index.html (https://progh2.github.io/catmoa/). CI 3-OS 빌드 성공(workflow_dispatch). **Google 실검증 완료**(로그인·목록·이벤트/태스크 생성·삭제·앱 경로 E2E, 계정 ham@e-mirim.hs.kr). 테스트 93개
+- decisions: 워커/워처는 cat 위젯을 parent로. 쿨메신저 기준일은 ReceiveDate. macOS 앱 LSUIElement. 산출물명 catmoa-{macos-arm64|windows-x86_64|linux-x86_64}. OAuth 동의 화면은 **프로덕션 게시**(테스트 모드는 refresh 토큰 7일 만료). oauthlib success_message는 text/plain → HTML 금지. 테스트는 `_load_dotenv`를 monkeypatch해 개발자 .env 격리. Linux offscreen segfault → tests/conftest.py 세션 정리 픽스처
+- next_steps: Release v1.0.0 산출물 확인 → #22 close → 실사용 피드백(Windows 쿨메신저 실DB, 스캔 PDF 비전, Wayland) 반영
