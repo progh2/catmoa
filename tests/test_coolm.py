@@ -95,6 +95,7 @@ def test_watcher_skips_existing_then_picks_new(app, tmp_path, monkeypatch):
     c.coolm.enabled = False
     w.apply_config()
     assert not w.active
+    w.deleteLater()
 
 
 def test_watcher_error_once(app, tmp_path, monkeypatch):
@@ -107,3 +108,4 @@ def test_watcher_error_once(app, tmp_path, monkeypatch):
     w.error.connect(errs.append)
     w.poll(); w.poll()
     assert len(errs) == 1 and "폴더가 없습니다" in errs[0]
+    w.deleteLater()

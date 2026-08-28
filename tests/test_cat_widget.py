@@ -23,6 +23,8 @@ def widget(app, tmp_path, monkeypatch):
     w = CatWidget(cfg.Config())
     yield w
     w.close()
+    w.deleteLater()
+    app.processEvents()
 
 
 def test_initial_state(widget):
