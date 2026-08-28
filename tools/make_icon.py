@@ -50,12 +50,39 @@ def make(size: int = 1024) -> Image.Image:
     return im
 
 
+def make_from_cat(size: int = 1024) -> Image.Image | None:
+    """사용자 고양이 이미지(기본 고양이)로 아이콘 생성: 크림색 둥근 사각형 위에 고양이."""
+    src = next((p for p in [ROOT / "assets" / "cat-src" / "기본 고양이.png", ROOT / "assets" / "cat" / "idle_1.png"] if p.exists()), None)
+    if src is None:
+        return None
+    cat = Image.open(src).convert("RGBA")
+    bbox = cat.getchannel("A").getbbox()
+    if bbox:
+        cat = cat.crop(bbox)
+    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    m = size // 16
+    d.rounded_rectangle((m, m, size - m, size - m), radius=size // 5, fill=(255, 250, 240, 255),
+                        outline=(240, 194, 123, 255), width=size // 28)
+    # 고양이를 캔버스의 82% 안에 맞춰 중앙 배치 (살짝 아래로)
+    box = int(size * 0.82)
+    scale = min(box / cat.width, box / cat.height)
+    cat = cat.resize((max(1, int(cat.width * scale)), max(1, int(cat.height * scale))), Image.LANCZOS)
+    x = (size - cat.width) // 2
+    y = (size - cat.height) // 2 + size // 40
+    im.alpha_composite(cat, (x, y))
+    return im
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
-    im = make()
+    im = make_from_cat() or make()
     im.save(OUT / "icon.png")
     im.save(OUT / "icon.ico", sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])
-    print("wrote", OUT / "icon.png", OUT / "icon.ico")
+    docs_icon = ROOT / "docs" / "icon.png"
+    if docs_icon.parent.exists():
+        im.resize((512, 512), Image.LANCZOS).save(docs_icon)   # 랜딩 페이지 로고/og:image
+    print("wrote", OUT / "icon.png", OUT / "icon.ico", docs_icon)
 
 
 if __name__ == "__main__":

@@ -70,6 +70,35 @@ def test_windows_arm_falls_back_to_x86_64(monkeypatch):
         updater.check_latest(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=rel)))
 
 
+def test_api_rate_limited_falls_back_to_redirect(monkeypatch):
+    monkeypatch.setattr(updater, "platform_key", lambda: ("windows", "arm64"))
+    seen = []
+
+    def handler(r: httpx.Request):
+        seen.append((r.method, str(r.url)))
+        if "api.github.com" in r.url.host:
+            return httpx.Response(403, json={"message": "API rate limit exceeded"})
+        if r.url.path.endswith("/releases/latest"):
+            return httpx.Response(302, headers={"location": "https://github.com/progh2/catmoa/releases/tag/v99.0.0"})
+        if r.method == "HEAD" and r.url.path.endswith("catmoa-windows-arm64.exe"):
+            return httpx.Response(404)
+        if r.method == "HEAD" and r.url.path.endswith("catmoa-windows-x86_64.exe"):
+            return httpx.Response(302, headers={"location": "https://objects.githubusercontent.com/x"})
+        return httpx.Response(500)
+
+    info = updater.check_latest(transport=httpx.MockTransport(handler))
+    assert info and info.tag == "v99.0.0" and info.asset_name == "catmoa-windows-x86_64.exe"
+    assert info.asset_url.endswith("/releases/download/v99.0.0/catmoa-windows-x86_64.exe") and info.notes == ""
+    assert seen[0][1].startswith("https://api.github.com") and any(m == "HEAD" for m, _ in seen)
+
+    # 폴백에서도 최신이면 None
+    def uptodate(r):
+        if "api.github.com" in r.url.host:
+            return httpx.Response(429)
+        return httpx.Response(302, headers={"location": f"https://github.com/progh2/catmoa/releases/tag/v{__version__}"})
+    assert updater.check_latest(transport=httpx.MockTransport(uptodate)) is None
+
+
 def test_download_with_progress(tmp_path):
     payload = b"x" * 1000
     tr = httpx.MockTransport(lambda r: httpx.Response(200, content=payload, headers={"content-length": "1000"}))

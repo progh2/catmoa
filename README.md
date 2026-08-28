@@ -58,7 +58,14 @@
 | OS | 파일 | 실행 |
 |---|---|---|
 | macOS (Apple Silicon) | `catmoa-macos-arm64.dmg` | 더블클릭 → `catmoa.app`을 Applications 로 드래그. 처음 실행 시 "악성 코드가 없음을 확인할 수 없음" 경고가 뜨면 아래 [macOS 첫 실행](#macos-첫-실행) 참고 |
-| Windows 10/11 | `catmoa-windows-x86_64.exe` | 단일 실행 파일 — 원하는 폴더에 두고 더블클릭 (첫 화면까지 몇 초 걸림). 브라우저·SmartScreen 경고가 뜨면 **유지 / 추가 정보 → 실행**. Windows on ARM(Parallels·Surface 등)도 같은 파일을 쓰면 됩니다(x64 에뮬레이션) |
+| Windows 10/11 | `catmoa-windows-x86_64.exe` | 단일 실행 파일 — 원하는 폴더에 두고 더블클릭 (첫 화면까지 몇 초 걸림). Windows on ARM(Parallels·Surface 등)도 같은 파일(x64 에뮬레이션). 서명되지 않은 앱이라 첫 실행 시 경고 → 아래 [Windows 첫 실행](#windows-첫-실행) |
+
+#### Windows 첫 실행
+코드 서명이 없어 SmartScreen이 한 번 막습니다.
+- **Edge가 다운로드를 차단**("안전하지 않은 다운로드"): 다운로드 목록에서 파일 위 **…** → **유지** → "자세히 표시" → **그래도 유지**. 계속 막히면 Chrome/Firefox로 받으세요.
+- **실행 시 "Windows의 PC 보호" 창**: **추가 정보** → **실행**.
+- 학교 PC처럼 정책으로 막힌 경우: 관리자에게 예외 등록을 요청하거나 [소스에서 실행](#소스에서-실행-개발).
+- 근본 해결은 코드 서명(Azure Trusted Signing 등)입니다 — 아래 [개발](#개발) 참고.
 | Linux (x86_64) | `catmoa-linux-x86_64.tar.gz` | 압축 해제 → `./catmoa/catmoa`. X11 권장 (Wayland는 항상-위 창이 제한될 수 있음). `libEGL.so.1` 등이 없다는 오류가 나면 Qt 런타임 설치: `sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 libdbus-1-3 libfontconfig1 libglib2.0-0`. 디스플레이(DISPLAY)가 없는 서버·컨테이너에서는 실행되지 않습니다 |
 
 #### macOS 첫 실행
@@ -106,7 +113,8 @@ Python 3.11 이상이 필요합니다. 가상환경 생성과 의존성 설치�
 - 진행 상황: [Milestones](https://github.com/progh2/catmoa/milestones) · [Issues](https://github.com/progh2/catmoa/issues)
 - 테스트: `pytest` (GUI 테스트는 `QT_QPA_PLATFORM=offscreen`)
 - 로컬 빌드: `pip install pyinstaller && python build.py` → `dist/`
-- 릴리스: `git tag v1.0.0 && git push --tags` → GitHub Actions가 macOS/Windows/Linux를 빌드해 Release에 첨부
+- 릴리스: `src/__init__.py`의 `__version__`을 올리고 같은 값으로 `git tag vX.Y.Z && git push origin vX.Y.Z` → GitHub Actions가 macOS/Windows/Linux를 빌드해 Release에 첨부 (버전 불일치면 빌드 실패)
+- 코드 서명(선택): Windows SmartScreen/Edge 차단을 없애려면 **Azure Trusted Signing**(월 약 $10, 개인도 가능) 또는 OV/EV 인증서로 `catmoa.exe`를 서명하고, macOS는 Apple Developer($99/년)로 서명·공증. 인증서가 준비되면 워크플로우에 서명 단계를 추가하면 됩니다.
 - Google OAuth 클라이언트 (필수, 1회):
   1. [Google Cloud Console](https://console.cloud.google.com/) → 프로젝트 생성 → **API 및 서비스**에서 *Google Calendar API*, *Google Tasks API* 사용 설정
   2. OAuth 동의 화면 구성 (테스트 사용자에 사용할 계정 추가) → 사용자 인증 정보 → **OAuth 클라이언트 ID → 데스크톱 앱**

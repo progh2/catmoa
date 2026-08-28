@@ -113,7 +113,7 @@ class Registrar:
                         ev = self.cal.create_event(item, s.calendar_id, d.alarm_minutes)
                         parts.append("📅")
                         log.info("캘린더 등록: %s", ev.get("htmlLink", ev.get("id")))
-                elif want_task and d.alarm_minutes is not None and s.task_alarm_as_event:
+                elif want_task and d.alarm_minutes is not None and s.task_alarm_as_event and not item.undated:
                     self.cal.create_event(_alarm_event_item(item), s.calendar_id, d.alarm_minutes,
                                           title=f"⏰ {item.title}", description_extra="Google Tasks 마감 알림용 이벤트")
                     parts.append("⏰")

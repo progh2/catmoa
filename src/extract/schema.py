@@ -48,6 +48,7 @@ class ScheduleItem(BaseModel):
     alarm_minutes: int | None = None     # None = 알람 없음 (기본값은 설정에서 채움)
     confidence: float = Field(0.8, ge=0.0, le=1.0)
     source: str = ""                      # 출처 표시 ("공문.hwp", "쿨메신저: 홍길동")
+    undated: bool = False                 # 날짜 없는 할 일(todo). start 는 기준일 자리표시, 캘린더 등록 불가
 
     @model_validator(mode="after")
     def _fix_end(self):
@@ -64,6 +65,8 @@ class ScheduleItem(BaseModel):
         return self.start.date()
 
     def describe_when(self) -> str:
+        if self.undated:
+            return "날짜 없음"
         if self.all_day:
             s = self.start.strftime("%Y-%m-%d")
             if self.end and self.end.date() != self.start.date():
@@ -131,10 +134,22 @@ def parse_time(s: str | None) -> time | None:
 
 
 def normalize(raw: RawItem, ref: date, source: str = "") -> ScheduleItem | None:
-    """RawItem → ScheduleItem. 날짜가 없으면 None (등록 불가)."""
+    """RawItem → ScheduleItem. 날짜가 없으면: task 는 '날짜 없는 할 일'로 유지, event 는 None."""
+    kind: Kind = "task" if str(raw.kind or "").lower().startswith("task") else "event"
     d = parse_date(raw.date, ref)
     if d is None:
-        return None
+        if kind != "task":
+            return None
+        conf = raw.confidence if isinstance(raw.confidence, (int, float)) else 0.8
+        try:
+            return ScheduleItem(
+                title=raw.title, start=datetime.combine(ref, time.min), all_day=True, kind="task", undated=True,
+                category=(raw.category or None) and str(raw.category).strip()[:100] or None,
+                notes=(raw.notes or None) and str(raw.notes).strip()[:2000] or None,
+                confidence=max(0.0, min(1.0, float(conf))), source=source,
+            )
+        except ValidationError:
+            return None
     t = parse_time(raw.time)
     ed = parse_date(raw.end_date, ref)
     et = parse_time(raw.end_time)
@@ -145,7 +160,6 @@ def normalize(raw: RawItem, ref: date, source: str = "") -> ScheduleItem | None:
         end = datetime.combine(ed or d, et or (t or time.min))
         if not all_day and et is None and ed is not None:
             end = datetime.combine(ed, t)  # 종료일만 있고 시간 없으면 같은 시각
-    kind: Kind = "task" if str(raw.kind or "").lower().startswith("task") else "event"
     conf = raw.confidence if isinstance(raw.confidence, (int, float)) else 0.8
     try:
         return ScheduleItem(

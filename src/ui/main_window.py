@@ -21,6 +21,7 @@ from src.sources.inbox import fetch_inbox_items
 from src.ui.cat_widget import CatWidget
 from src.ui.review_dialog import Decision, ReviewDialog
 from src.ui.settings_dialog import SettingsDialog, _Task
+from src.ui.toast import Toast
 
 log = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ class AppController:
         self._review: ReviewDialog | None = None
         self._tasks: list[_Task] = []
         self._boxes: list[QMessageBox] = []
+        self.toast = Toast()
 
         # 쿨메신저 폴링 (설정에서 켠 경우에만 동작)
         self.coolm = CoolmWatcher(self.config, parent=self.cat)
@@ -75,7 +77,8 @@ class AppController:
     def _extract_options(self) -> dict:
         s = self.config.schedule
         return {"kind_rules": s.kind_rules, "category_rules": s.category_rules,
-                "categories": [name for _, name in self.tasklists]}
+                "categories": [name for _, name in self.tasklists],
+                "persona": s.persona, "skip_irrelevant": s.skip_irrelevant}
 
     def refresh_tasklists(self) -> None:
         if not self.google.is_logged_in():
@@ -113,8 +116,12 @@ class AppController:
             return
         res = self._pending.popleft()
         ex = res.extraction
-        if not ex.items and not ex.warnings:
-            self.cat.flash("empty", f"{res.item.short}: 일정을 찾지 못했습니다.")
+        if not ex.items:
+            # 일정 없음 → 검토창 대신 살짝 알림
+            msg = _no_items_message(res.item, ex)
+            self.cat.flash("empty", msg)
+            self.toast.show_message(msg, near=self.cat)
+            log.info("일정 없음: %s (scope=%s)", res.item.short, ex.scope)
             self._show_next_review()
             return
         dlg = ReviewDialog(ex.items, self.config.schedule, source_label=res.item.short,
@@ -177,6 +184,7 @@ class AppController:
         if rep.ok:
             self.cat.set_busy(False)
             self.cat.face.setToolTip(f"등록 완료: {len(rep.successes)}건")
+            self.toast.show_message(f"등록 완료 — {len(rep.successes)}건", near=self.cat)
         else:
             self.cat.show_error(f"등록 실패 {len(rep.failures)}건")
             box = QMessageBox(QMessageBox.Icon.Warning, "등록 결과", rep.summary(), parent=None)
@@ -296,6 +304,18 @@ class AppController:
 
     def show(self) -> None:
         self.cat.show()
+
+
+def _no_items_message(item, ex) -> str:
+    """일정이 없을 때 출처에 맞춘 한 줄 안내."""
+    label = {"text": "붙여넣은 텍스트", "image": "붙여넣은 이미지", "file": item.short,
+             "coolm": f"쿨메신저 쪽지({item.short.replace('쿨메신저: ', '')})",
+             "inbox_task": f"인박스 항목({item.short.replace('인박스: ', '')})"}.get(item.kind, item.short)
+    if ex.scope == "irrelevant":
+        return f"{label}은(는) 내 업무와 무관해 보여 넘겼어요 — {ex.scope_reason or '역할 기준'}"
+    if ex.warnings and any("지나간 항목" in w for w in ex.warnings):
+        return f"{label}에는 이미 지난 일정만 있네요"
+    return f"{label}에 일정이 없네요"
 
 
 def _preview_of(res: PipelineResult) -> str:

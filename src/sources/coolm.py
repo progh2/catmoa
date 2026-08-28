@@ -71,6 +71,8 @@ _QUOTE_LINE_RE = re.compile(
     r")\s*$",
     re.I,
 )
+# 쿨메신저 실제 인용/전달 표기: "홍길동님이 보낸글 >>", "보낸 메시지 전달 >>", "메시지 전달 >>" (앞에 이름 등 최대 100자)
+_COOLM_MARK_RE = re.compile(r"^[^\n]{0,100}?(?:님이\s*보낸\s*글|보낸\s*메시지(?:\s*전달)?|메시지\s*전달)\s*>>")
 _HEADER_KEY_RE = re.compile(r"^\s*(from|보낸\s*사람|발신|발신자|sent|보낸\s*날짜|날짜|date|to|받는\s*사람|수신|subject|제목)\s*[:：]", re.I)
 _GT_RE = re.compile(r"^\s*>")
 
@@ -82,6 +84,9 @@ def split_recent(body: str) -> tuple[str, str]:
     for i, line in enumerate(lines):
         if i == 0 and not line.strip():
             continue
+        if _COOLM_MARK_RE.match(line):          # 쿨메신저 표기는 첫 줄이어도 인용 시작 (본문이 비어 있는 전달)
+            cut = i
+            break
         if _QUOTE_LINE_RE.match(line):
             cut = i
             break

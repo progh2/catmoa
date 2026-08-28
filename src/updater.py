@@ -109,19 +109,47 @@ def install_root() -> Path:
 
 # ---------------------------------------------------------------- 조회
 
+def _check_latest_fallback(c: httpx.Client) -> UpdateInfo | None:
+    """API 한도(403/429) 등으로 API 를 못 쓸 때: github.com/…/releases/latest 의 리다이렉트로 최신 태그를 알아내고
+    다운로드 URL 을 직접 구성한다 (한도 없음). 릴리스 노트는 없다."""
+    r = c.get(f"https://github.com/{REPO}/releases/latest", follow_redirects=False)
+    loc = r.headers.get("location", "")
+    if r.status_code not in (301, 302, 303, 307, 308) or "/releases/tag/" not in loc:
+        if r.status_code == 404:
+            return None
+        raise UpdateError(f"업데이트 확인 실패 (github.com {r.status_code})")
+    tag = loc.rsplit("/releases/tag/", 1)[1].strip("/")
+    version = tag.lstrip("vV")
+    if not is_newer(version):
+        return None
+    for name in asset_candidates():
+        url = f"https://github.com/{REPO}/releases/download/{tag}/{name}"
+        h = c.head(url, follow_redirects=False)
+        if h.status_code in (200, 302, 303, 307):
+            return UpdateInfo(version=version, tag=tag, notes="", html_url=loc, asset_name=name, asset_url=url)
+    pk = platform_key()
+    raise UpdateError(f"새 버전 {tag} 이 있지만 이 환경({pk[0]}/{pk[1]})용 파일이 아직 없습니다. {RELEASES_PAGE}")
+
+
 def check_latest(transport=None, timeout: float = 10.0) -> UpdateInfo | None:
-    """새 버전이 있으면 UpdateInfo, 최신이면 None. 네트워크 오류는 UpdateError."""
+    """새 버전이 있으면 UpdateInfo, 최신이면 None. 네트워크 오류는 UpdateError.
+    GitHub API 가 한도 초과(403/429) 등으로 실패하면 리다이렉트 기반 폴백을 쓴다."""
     try:
         with httpx.Client(timeout=timeout, transport=transport, follow_redirects=True,
                           headers={"Accept": "application/vnd.github+json", "User-Agent": f"catmoa/{__version__}"}) as c:
             r = c.get(LATEST_URL)
+            if r.status_code == 404:
+                return None
+            if r.status_code >= 400:
+                log.info("GitHub API %s → 리다이렉트 폴백", r.status_code)
+                return _check_latest_fallback(c)
+            data = r.json()
+            return _info_from_api(data)
     except httpx.HTTPError as e:
         raise UpdateError(f"업데이트 서버에 연결할 수 없습니다: {e}") from e
-    if r.status_code == 404:
-        return None
-    if r.status_code >= 400:
-        raise UpdateError(f"업데이트 확인 실패 ({r.status_code})")
-    data = r.json()
+
+
+def _info_from_api(data: dict) -> UpdateInfo | None:
     tag = data.get("tag_name", "")
     version = tag.lstrip("vV")
     if not is_newer(version):

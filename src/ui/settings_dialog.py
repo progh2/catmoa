@@ -288,6 +288,14 @@ class SettingsDialog(QDialog):
         lay = QVBoxLayout(w)
         s = self.config.schedule
 
+        lay.addWidget(QLabel("<b>👤 내 역할</b> — 쪽지·공문이 <i>내</i> 업무인지 판단하는 기준. 비워두면 판정하지 않습니다."))
+        self.persona = QLineEdit(s.persona)
+        self.persona.setPlaceholderText("예) 중학교 2학년 3반 담임, 정보 교과, 정보부 (에듀테크 담당)")
+        lay.addWidget(self.persona)
+        self.skip_irrelevant = QCheckBox("내 업무와 무관하다고 판단되면 등록 제안 없이 알림만 (판단이 불확실하면 검토창에 경고 표시)")
+        self.skip_irrelevant.setChecked(s.skip_irrelevant)
+        lay.addWidget(self.skip_irrelevant)
+
         lay.addWidget(QLabel("<b>📅 캘린더 / ✅ 태스크 분류 규칙</b> — AI가 event/task를 나눌 때 기본 규칙보다 우선 적용됩니다."))
         self.kind_rules = QPlainTextEdit(s.kind_rules)
         self.kind_rules.setPlaceholderText(
@@ -622,6 +630,8 @@ class SettingsDialog(QDialog):
         s.default_target = self.default_target.currentData()
         s.kind_rules = self.kind_rules.toPlainText().strip()
         s.category_rules = self.category_rules.toPlainText().strip()
+        s.persona = self.persona.text().strip()
+        s.skip_irrelevant = self.skip_irrelevant.isChecked()
         s.alarm_enabled = self.alarm_enabled.isChecked()
         s.alarm_minutes = self.alarm_minutes.value()
         s.task_alarm_as_event = self.task_alarm_as_event.isChecked()

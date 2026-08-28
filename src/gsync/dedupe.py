@@ -141,7 +141,7 @@ def find_duplicates(decisions: list[Decision], settings: cfg.ScheduleSettings, *
                 if sc < THRESHOLD:
                     continue
                 due = _task_due(t)
-                if due is not None and abs((due - d.item.start.date()).days) > 3:
+                if due is not None and not d.item.undated and abs((due - d.item.start.date()).days) > 3:
                     continue
                 if best is None or sc > best[0]:
                     best = (sc, t)

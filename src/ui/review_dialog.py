@@ -45,6 +45,8 @@ def default_targets(item: ScheduleItem, settings: cfg.ScheduleSettings) -> set[s
         return {"calendar"}
     if mode == "task":
         return {"task"}
+    if item.undated:
+        return {"task"}
     if mode == "both":
         return {"calendar", "task"}
     return {"calendar"} if item.kind == "event" else {"task"}
@@ -122,9 +124,15 @@ class _Row(QFrame):
         self.end_date.setDisplayFormat("yyyy-MM-dd")
         self.location = QLineEdit(item.location or "")
         self.location.setPlaceholderText("장소")
+        self.no_date = QCheckBox("날짜 없음")
+        self.no_date.setToolTip("마감 없는 할 일 — 태스크에만 넣을 수 있습니다")
+        self.no_date.setChecked(item.undated)
+        if item.undated:
+            self.cal.setChecked(False)
 
         r2 = QHBoxLayout()
         r2.addSpacing(8)
+        r2.addWidget(self.no_date)
         r2.addWidget(self.date)
         r2.addWidget(self.all_day)
         r2.addWidget(self.time)
@@ -154,7 +162,7 @@ class _Row(QFrame):
         lay.addLayout(r2)
         lay.addWidget(self.notes)
 
-        for w in (self.all_day, self.has_end, self.cal, self.task, self.alarm):
+        for w in (self.all_day, self.has_end, self.cal, self.task, self.alarm, self.no_date):
             w.toggled.connect(self._sync_enabled)
         self._sync_enabled()
 
@@ -181,6 +189,16 @@ class _Row(QFrame):
         self.tasklist.setEnabled(self.task.isChecked())
         self.setStyleSheet("_Row { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; }"
                            if on else "_Row { background: palette(window); border: 1px dashed palette(mid); border-radius: 8px; }")
+        undated = self.no_date.isChecked()
+        if undated:
+            # 날짜 없는 할 일: 캘린더 불가, 날짜/시간/알람 비활성
+            if self.cal.isChecked():
+                self.cal.setChecked(False)
+            self.cal.setEnabled(False)
+            for w in (self.date, self.all_day, self.time, self.has_end, self.end_date, self.end_time, self.alarm, self.alarm_min):
+                w.setEnabled(False)
+            return
+        self.cal.setEnabled(True)
         if on:
             self.alarm_min.setEnabled(self.alarm.isChecked())
             all_day = self.all_day.isChecked()
@@ -217,10 +235,15 @@ class _Row(QFrame):
             if end < start:
                 end = None
         targets = self.targets()
-        alarm = self.alarm_min.value() if self.alarm.isChecked() else None
+        undated = self.no_date.isChecked()
+        if undated:
+            targets.discard("calendar")
+            if not targets:
+                return None
+        alarm = None if undated else (self.alarm_min.value() if self.alarm.isChecked() else None)
         item = self.item.model_copy(update={
             "title": self.title.text().strip() or self.item.title,
-            "start": start, "end": end, "all_day": all_day,
+            "start": start, "end": end, "all_day": all_day, "undated": undated,
             "kind": "task" if targets == {"task"} else ("event" if targets == {"calendar"} else self.item.kind),
             "category": self.tasklist.currentText() if self.tasklist.currentData() else self.item.category,
             "location": self.location.text().strip() or None,

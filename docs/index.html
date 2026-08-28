@@ -58,22 +58,21 @@
 
   /* ── 히어로 ── */
   .hero { text-align: center; padding: 48px 0 40px; position: relative; }
-  .cat-stage { position: relative; height: 200px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 -20px; }
+  .cat-stage { position: relative; height: 240px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 -20px; }
   .cat {
-    font-size: clamp(40px, 9vw, 72px);
-    font-weight: 700;
-    letter-spacing: -.02em;
-    background: var(--card);
-    padding: 12px 34px;
-    border-radius: 999px;
-    border: 4px solid var(--peach);
-    box-shadow: var(--shadow);
+    width: clamp(150px, 34vw, 210px); height: auto;
+    filter: drop-shadow(0 10px 18px rgba(90, 60, 20, .18));
     animation: bob 3s ease-in-out infinite;
-    white-space: nowrap;
-    font-family: "Pretendard Variable", "Hiragino Sans", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
-    user-select: none;
+    user-select: none; -webkit-user-drag: none; cursor: pointer;
   }
   .cat.eat { animation: chomp .5s ease-in-out infinite; }
+  /* 표정 갤러리 */
+  .moods { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 14px; margin-top: 22px; }
+  .mood { background: var(--card); border: 2px solid var(--peach); border-radius: 16px; padding: 12px 8px 10px; text-align: center; box-shadow: var(--shadow); transition: transform .2s; }
+  .mood:hover { transform: translateY(-4px); }
+  .mood img { width: 96px; height: 96px; display: block; margin: 0 auto 6px; }
+  .mood b { display: block; font-size: 14px; }
+  .mood span { font-size: 12px; color: var(--brown-soft); }
   @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
   @keyframes chomp { 0%,100% { transform: scale(1) } 50% { transform: scale(1.06) rotate(-2deg) } }
   .food {
@@ -94,7 +93,7 @@
   }
   .tooltip.show { opacity: 1; }
   @media (max-width: 520px) {
-    .cat { font-size: 34px; padding: 10px 22px; border-width: 3px; }
+    .cat-stage { height: 200px; }
     .food { font-size: 26px; }
     .food:nth-of-type(1) { --fx: -130px !important; --fy: -70px !important; }
     .food:nth-of-type(2) { --fx: 130px !important; --fy: -60px !important; }
@@ -224,7 +223,7 @@
       <span class="food" style="--fx:-260px;--fy:-90px;animation-delay:0s">📄</span>
       <span class="food" style="--fx:250px;--fy:-70px;animation-delay:2s">🖼️</span>
       <span class="food" style="--fx:-200px;--fy:80px;animation-delay:4s">💬</span>
-      <div class="cat" id="cat">(=^･ω･^=)</div>
+      <img class="cat" id="cat" src="cat/idle_1.png" alt="catmoa 고양이" width="210" height="210" draggable="false">
     </div>
     <h1>일정 자료를 <span class="hl">고양이에게</span> 던지세요</h1>
     <p class="sub">한글 문서 · PDF · 스크린샷 · 쿨메신저 쪽지 · 복사한 텍스트.
@@ -270,12 +269,25 @@
     <h2><span class="paw">🐾</span>주요 기능</h2>
     <p class="lead">작지만 항상 곁에 있는 고양이. 표정으로 상태를 알려줍니다.</p>
     <div class="grid">
-      <div class="feat"><div class="ic bg-peach">🐱</div><div><h3>고양이 플로팅 위젯</h3><p>항상 위에 떠 있는 작은 텍스트 고양이. 처리 중이면 🍙 먹고, 끝나면 ♪ 노래해요.</p></div></div>
+      <div class="feat"><div class="ic bg-peach">🐱</div><div><h3>고양이 플로팅 위젯</h3><p>항상 위에 떠 있는 작은 고양이. 처리 중이면 밥을 먹고, 끝나면 기뻐하고, 오래 심심하면 지루해해요.</p></div></div>
       <div class="feat"><div class="ic bg-pink">📄</div><div><h3>파일 드롭 & 붙여넣기</h3><p>hwp/hwpx/pdf(스캔본 포함)/이미지 파일, 클립보드의 스크린샷·텍스트까지.</p></div></div>
       <div class="feat"><div class="ic bg-mint">🔐</div><div><h3>JSON 없는 Google 로그인</h3><p>브라우저 로그인만으로 연결. 토큰은 OS 키체인에 안전하게 저장.</p></div></div>
       <div class="feat"><div class="ic bg-sky">📥</div><div><h3>Google Tasks 인박스</h3><p>휴대폰에서 대충 적어둔 "인박스" 항목을 불러와 AI가 정리·등록.</p></div></div>
       <div class="feat"><div class="ic bg-peach">💬</div><div><h3>쿨메신저 연동 (Windows)</h3><p>새 쪽지를 30초마다 확인해 자동 분석. 원본 DB는 읽기 전용 복사본만 사용.</p></div></div>
-      <div class="feat"><div class="ic bg-pink">🧠</div><div><h3>LLM 자유 선택</h3><p>Claude / ChatGPT / 로컬 Ollama. 모델 목록 조회와 연결 테스트 내장.</p></div></div>
+      <div class="feat"><div class="ic bg-pink">🧠</div><div><h3>LLM 자유 선택</h3><p>Claude / ChatGPT / Gemini / Solar(Upstage) / 로컬 Ollama. 모델 목록 조회와 연결 테스트 내장.</p></div></div>
+    </div>
+
+    <h3 style="margin-top:36px;text-align:center">고양이의 하루</h3>
+    <p class="lead" style="margin-bottom:0">표정만 봐도 지금 무슨 일을 하는지 알 수 있어요.</p>
+    <div class="moods">
+      <div class="mood"><img src="cat/idle_1.png" alt="기본"><b>대기 중</b><span>뭐든 던져주세요</span></div>
+      <div class="mood"><img src="cat/drag.png" alt="놀람"><b>앗, 파일!</b><span>끌어다 놓기 직전</span></div>
+      <div class="mood"><img src="cat/searching.png" alt="서류 찾는 중"><b>서류 뒤지는 중</b><span>문서 읽기 · 쿨메신저 확인</span></div>
+      <div class="mood"><img src="cat/eating_1.png" alt="먹는 중"><b>냠냠</b><span>AI가 일정 분석 중</span></div>
+      <div class="mood"><img src="cat/happy.png" alt="기쁨"><b>완료!</b><span>캘린더·태스크 등록됨</span></div>
+      <div class="mood"><img src="cat/empty.png" alt="시무룩"><b>일정이 없네요</b><span>붙여넣은 내용에 일정 없음</span></div>
+      <div class="mood"><img src="cat/error.png" alt="우는 중"><b>앗, 오류</b><span>연결·처리 실패</span></div>
+      <div class="mood"><img src="cat/bored.png" alt="지루함"><b>심심해…</b><span>5분째 입력 없음</span></div>
     </div>
   </section>
 
@@ -313,7 +325,13 @@
               <li>또는 터미널에서 <code>xattr -cr /Applications/catmoa.app</code> (앱을 둔 경로로)</li>
             </ul>
           </li>
-          <li><b>Windows</b>: 브라우저가 "안전하지 않은 파일"이라 하면 <b>유지</b>, 실행 시 SmartScreen 창에서 <b>추가 정보 → 실행</b>. (단일 실행 파일이라 첫 화면까지 몇 초 걸려요)</li>
+          <li><b>Windows</b>: 서명되지 않은 앱이라 처음 한 번 경고가 뜹니다 (단일 실행 파일이라 첫 화면까지 몇 초 걸려요).
+            <ul>
+              <li><b>Edge에서 다운로드가 막힐 때</b>: 다운로드 목록에서 파일 위 <b>…</b> → <b>유지</b> → "자세히 표시" → <b>그래도 유지</b>. 그래도 안 되면 Chrome/Firefox로 받거나, 주소창 우측 다운로드 아이콘 → 파일 우클릭 → 유지.</li>
+              <li><b>실행 시 "Windows의 PC 보호" 창</b>: <b>추가 정보</b> → <b>실행</b>.</li>
+              <li>회사·학교 PC에서 SmartScreen 정책으로 아예 막히면 관리자에게 예외 등록을 요청하거나 <a href="https://github.com/progh2/catmoa#소스에서-실행-개발">소스로 실행</a>하세요.</li>
+            </ul>
+          </li>
           <li><b>Linux</b>: <code>tar xzf catmoa-linux-*.tar.gz && ./catmoa/catmoa</code></li>
         </ul>
       </details>
@@ -355,7 +373,7 @@ run.cmd       # Windows</pre>
   </section>
 
   <footer>
-    <div class="cat-small">(=^◡ω◡^=)♪</div>
+    <div class="cat-small"><img src="cat/happy.png" alt="" width="72" height="72" style="vertical-align:middle"></div>
     <div>catmoa · MIT License · <a href="https://github.com/progh2/catmoa" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/progh2/catmoa/issues" target="_blank" rel="noopener">버그 제보 / 제안</a></div>
     <div style="margin-top:6px"><a href="privacy.html">개인정보처리방침</a> · <a href="terms.html">서비스 약관</a></div>
     <div style="margin-top:6px">쿨메신저 .udb 읽기 방식은 <a href="https://github.com/dacisosl/coolm-helper" target="_blank" rel="noopener">coolm-helper</a>(MIT)를 참고했습니다.</div>
@@ -363,16 +381,20 @@ run.cmd       # Windows</pre>
 </div>
 
 <script>
-  // ── 고양이 표정 애니메이션 (앱의 CAT_FACES와 동일) ──
+  // ── 고양이 표정 애니메이션 (앱의 assets/cat 이미지와 동일) ──
   const FACES = {
-    idle:   ["(=^･ω･^=)", "(=^･ω･^=)", "(=^･ω･^=)", "(=^-ω-^=)"],
-    eating: ["(=^･ω･^=)🍙", "(=^ω^=)🍙", "(=^･ω･^=)🍚", "(=^ω^=) "],
-    happy:  ["(=^◡ω◡^=)♪", "(=^◡ω◡^=)♫"],
-    hover:  ["(=^･ω･^=)ノ", "(=^･ω･^=)ﾉ"],
+    idle:   ["cat/idle_1.png", "cat/idle_1.png", "cat/idle_1.png", "cat/idle_1.png", "cat/idle_1.png", "cat/idle_6.png"],
+    eating: ["cat/eating_1.png", "cat/eating_2.png"],
+    happy:  ["cat/happy.png"],
+    hover:  ["cat/hover.png"],
   };
+  Object.values(FACES).flat().forEach(src => { const i = new Image(); i.src = src; });   // 미리 로드
   const cat = document.getElementById("cat"), tip = document.getElementById("tip");
   let state = "idle", frame = 0, hovering = false;
-  setInterval(() => { const f = FACES[hovering ? "hover" : state]; cat.textContent = f[frame++ % f.length]; }, 450);
+  setInterval(() => {
+    const f = FACES[hovering ? "hover" : state], src = f[frame++ % f.length];
+    if (!cat.src.endsWith(src)) cat.src = src;
+  }, 450);
   // 6초 주기: 음식이 도착(≈2.7s)하면 먹고 → 기뻐하고 → 다시 idle
   function cycle() {
     setTimeout(() => { state = "eating"; cat.classList.add("eat"); }, 2600);

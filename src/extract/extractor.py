@@ -27,6 +27,8 @@ class ExtractionResult:
     items: list[ScheduleItem]
     warnings: list[str] = field(default_factory=list)
     raw_text: str = ""          # LLM 원 응답 (디버그)
+    scope: str = "relevant"     # relevant | irrelevant | ambiguous (사용자 역할 기준)
+    scope_reason: str = ""
 
 
 class Extractor:
@@ -36,12 +38,14 @@ class Extractor:
     def extract(self, parsed: ParsedInput, ref: date | None = None, source: str = "", *,
                 kind_rules: str = "", category_rules: str = "",
                 categories: list[str] | tuple[str, ...] = (),
-                drop_before: date | None = None) -> ExtractionResult:
-        """drop_before: 이 날짜보다 앞선 항목은 버린다 (예: 쪽지 수신일 이전의 지나간 일정)."""
+                drop_before: date | None = None, persona: str = "", skip_irrelevant: bool = True) -> ExtractionResult:
+        """drop_before: 이 날짜보다 앞선 항목은 버린다 (예: 쪽지 수신일 이전의 지나간 일정).
+        persona: 사용자 역할. 주어지면 scope(관련성)를 판정하고, skip_irrelevant 면 무관한 내용은 항목을 비운다."""
         ref = ref or date.today()
         source = source or parsed.source
         warnings: list[str] = []
-        prompt_opts = dict(kind_rules=kind_rules, category_rules=category_rules, categories=tuple(categories))
+        prompt_opts = dict(kind_rules=kind_rules, category_rules=category_rules, categories=tuple(categories),
+                           persona=persona)
 
         text = parsed.text or ""
         if len(text) > MAX_TEXT_CHARS:
@@ -77,18 +81,34 @@ class Extractor:
         if skipped:
             warnings.append(f"날짜를 확정할 수 없는 항목 {skipped}개를 제외했습니다.")
         if drop_before is not None:
-            past = [i for i in items if i.start.date() < drop_before]
+            past = [i for i in items if not i.undated and i.start.date() < drop_before]
             if past:
-                items = [i for i in items if i.start.date() >= drop_before]
+                items = [i for i in items if i.undated or i.start.date() >= drop_before]
                 warnings.append(f"{drop_before:%m/%d} 이전의 지나간 항목 {len(past)}개를 제외했습니다: "
                                 + ", ".join(i.title[:20] for i in past[:3]))
-        return ExtractionResult(items=items, warnings=warnings, raw_text=raw)
+
+        scope, reason = _scope_of(data) if persona.strip() else ("relevant", "")
+        if scope == "irrelevant" and skip_irrelevant and items:
+            warnings.append(f"내 업무와 무관한 내용으로 판단해 {len(items)}개 항목을 등록하지 않습니다: {reason or '(이유 없음)'}")
+            items = []
+        elif scope == "ambiguous" and items:
+            warnings.append(f"내 업무와 관련 있는지 불확실합니다: {reason or '(이유 없음)'}")
+        return ExtractionResult(items=items, warnings=warnings, raw_text=raw, scope=scope, scope_reason=reason)
 
     def _call(self, req: LLMRequest) -> str:
         try:
             return self.provider.complete(req)
         except LLMError as e:
             raise ExtractionError(str(e)) from e
+
+
+def _scope_of(data) -> tuple[str, str]:
+    if not isinstance(data, dict):
+        return "relevant", ""
+    scope = str(data.get("scope") or "relevant").strip().lower()
+    if scope not in ("relevant", "irrelevant", "ambiguous"):
+        scope = "relevant"
+    return scope, str(data.get("scope_reason") or "").strip()[:200]
 
 
 def _to_items(data, ref: date, source: str) -> tuple[list[ScheduleItem], int]:
@@ -116,10 +136,10 @@ def _to_items(data, ref: date, source: str) -> tuple[list[ScheduleItem], int]:
         if item is None:
             skipped += 1
             continue
-        key = (item.title, item.start, item.kind)
+        key = (item.title, item.start, item.kind, item.undated)
         if key in seen:
             continue
         seen.add(key)
         items.append(item)
-    items.sort(key=lambda i: i.start)
+    items.sort(key=lambda i: (i.undated, i.start))     # 날짜 있는 것 먼저
     return items, skipped

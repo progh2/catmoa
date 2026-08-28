@@ -49,6 +49,8 @@ class ScheduleSettings:
     default_target: str = "auto"        # auto | calendar | task | both
     kind_rules: str = ""                # 사용자 분류 규칙 (캘린더 vs 태스크)
     category_rules: str = ""            # 사용자 태스크 카테고리(목록) 규칙
+    persona: str = ""                   # 내 역할 (예: "중학교 2학년 담임, 정보 교과, 정보부") — 관련성 판정 기준
+    skip_irrelevant: bool = True        # 내 업무와 무관하다고 판단되면 등록 제안하지 않음
     alarm_enabled: bool = True
     alarm_minutes: int = 30
     task_alarm_as_event: bool = True    # 태스크 알람 → 캘린더 알림 이벤트 생성

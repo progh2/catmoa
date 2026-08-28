@@ -8,7 +8,7 @@ DEFAULT_LIST = "@default"
 
 def task_body(item: ScheduleItem) -> dict:
     notes_parts = []
-    if not item.all_day:
+    if not item.all_day and not item.undated:
         notes_parts.append(f"시각: {item.start.strftime('%H:%M')}")   # Tasks API는 due 의 시간을 무시한다
     if item.location:
         notes_parts.append(f"장소: {item.location}")
@@ -16,11 +16,10 @@ def task_body(item: ScheduleItem) -> dict:
         notes_parts.append(item.notes)
     if item.source:
         notes_parts.append(f"출처: {item.source}")
-    body: dict = {
-        "title": item.title,
+    body: dict = {"title": item.title}
+    if not item.undated:
         # RFC3339. 날짜만 의미 있음 (시간 부분은 API가 버린다)
-        "due": item.start.date().isoformat() + "T00:00:00.000Z",
-    }
+        body["due"] = item.start.date().isoformat() + "T00:00:00.000Z"
     if notes_parts:
         body["notes"] = "\n".join(notes_parts)
     return body
@@ -68,7 +67,7 @@ class TasksClient:
     def update_task(self, tasklist_id: str, task_id: str, item: ScheduleItem) -> dict:
         """기존 태스크의 마감·메모를 새 항목으로 갱신 (제목은 기존 유지)."""
         body = task_body(item)
-        patch = {"due": body["due"]}
+        patch = {"due": body["due"]} if "due" in body else {}
         if body.get("notes"):
             patch["notes"] = body["notes"]
         return self.svc.tasks().patch(tasklist=tasklist_id or DEFAULT_LIST, task=task_id, body=patch).execute()
