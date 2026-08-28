@@ -19,8 +19,10 @@ log = logging.getLogger(__name__)
 class AppController:
     def __init__(self):
         self.config = cfg.Config.load()
-        self.google = None            # v0.3: gsync.auth.GoogleAuth
-        self.registrar = None         # v0.3: gsync.registrar.Registrar
+        from src.gsync.auth import GoogleAuth
+
+        self.google = GoogleAuth()
+        self.registrar = None         # v0.3 #14/#15: gsync.registrar.Registrar
 
         self.cat = CatWidget(self.config)
         self.cat.items_received.connect(self.on_items)

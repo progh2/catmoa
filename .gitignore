@@ -13,8 +13,9 @@ build/
 dist/
 *.spec.bak
 
-# 빌드 시 주입되는 비밀 (GitHub Secrets → 생성)
+# 빌드 시 주입되는 비밀 (GitHub Secrets → 생성) / 로컬 개발용 .env
 src/_secrets.py
+.env
 
 # 로컬 설정/토큰 (실제 저장 위치는 platformdirs, 여기는 안전장치)
 *.token.json

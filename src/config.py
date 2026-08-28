@@ -212,10 +212,29 @@ def delete_secret(name: str) -> None:
 
 # ---------------------------------------------------------------- 빌드 시 주입 비밀 (Google OAuth 클라이언트)
 
+def _load_dotenv() -> dict[str, str]:
+    """프로젝트 루트의 .env (개발용, git 제외). KEY=VALUE 줄만 읽는다."""
+    p = Path(__file__).resolve().parent.parent / ".env"
+    out: dict[str, str] = {}
+    if not p.exists():
+        return out
+    try:
+        for line in p.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return out
+
+
 def google_client() -> tuple[str, str]:
-    """(client_id, client_secret). 우선순위: 환경변수 > 빌드 시 생성된 src/_secrets.py > 빈 문자열."""
-    cid = os.environ.get("CATMOA_GOOGLE_CLIENT_ID", "")
-    csec = os.environ.get("CATMOA_GOOGLE_CLIENT_SECRET", "")
+    """(client_id, client_secret). 우선순위: 환경변수 > .env > 빌드 시 생성된 src/_secrets.py > 빈 문자열."""
+    env = {**_load_dotenv(), **{k: v for k, v in os.environ.items() if k.startswith("CATMOA_")}}
+    cid = env.get("CATMOA_GOOGLE_CLIENT_ID", "")
+    csec = env.get("CATMOA_GOOGLE_CLIENT_SECRET", "")
     if cid:
         return cid, csec
     try:
