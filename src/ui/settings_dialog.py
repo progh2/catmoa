@@ -81,7 +81,8 @@ def default_coolm_dir() -> str:
 class SettingsDialog(QDialog):
     saved = Signal(object)   # cfg.Config
 
-    TAB_INDEX = {"llm": 0, "general": 1, "rules": 2, "teacher": 3, "google": 4, "coolm": 5, "update": 6}
+    TAB_INDEX = {"llm": 0, "general": 1, "rules": 2, "privacy": 3, "teacher": 4,
+                 "google": 5, "coolm": 6, "update": 7}
 
     def __init__(self, config: cfg.Config, google_auth: GoogleAuthLike | None = None, parent: QWidget | None = None,
                  *, initial_tab: str | None = None, update_info=None, quit_callback: Callable[[], None] | None = None,
@@ -106,6 +107,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_llm(), "LLM")
         tabs.addTab(self._build_general(), "일반")
         tabs.addTab(self._build_rules(), "분류 규칙")
+        tabs.addTab(self._build_privacy(), "개인정보")
         tabs.addTab(self._build_teacher(), "교사")
         tabs.addTab(self._build_google(), "Google")
         tabs.addTab(self._build_coolm(), "쿨메신저")
@@ -370,19 +372,6 @@ class SettingsDialog(QDialog):
         lay = QVBoxLayout(w)
         s = self.config.schedule
 
-        from src.privacy import model_available
-
-        self.mask_pii = QCheckBox("🔒 AI에 보내기 전에 개인정보 가리기 (이름·전화·이메일·주민번호·주소·학번 등 → [이름1] 식 토큰)")
-        self.mask_pii.setChecked(s.mask_pii)
-        self.mask_pii.setToolTip("PC 안에서 규칙으로 가리고, AI 결과에 남은 토큰은 원문으로 복원합니다. "
-                                 "캘린더 메모·태스크 하단의 원문은 가리지 않습니다. 이미지 속 글자는 가릴 수 없습니다.")
-        lay.addWidget(self.mask_pii)
-        mask_note = QLabel("규칙 기반 마스킹 내장" + (" + 로컬 AI 모델(schift-ko-pii-v6) 사용 중" if model_available()
-                           else " · 문맥형 인명 탐지 모델(schift-ko-pii-v6)은 선택 설치 (README 참고)"))
-        mask_note.setStyleSheet("color: palette(mid); font-size: 11px;")
-        mask_note.setWordWrap(True)
-        lay.addWidget(mask_note)
-
         lay.addWidget(QLabel("<b>👤 내 역할</b> — 쪽지·공문이 <i>내</i> 업무인지 판단하는 기준. 비워두면 판정하지 않습니다."))
         self.persona = QLineEdit(s.persona)
         self.persona.setPlaceholderText("예) 중학교 2학년 3반 담임, 정보 교과, 정보부 (에듀테크 담당)")
@@ -447,6 +436,86 @@ class SettingsDialog(QDialog):
         except (ValueError, AttributeError):
             return QTime(9, 0)
 
+    # ------------------------------------------------------------ 개인정보 탭
+    SAMPLE_PII = ("2학년 3반 담임 김민수 선생님께 안내드립니다.\n"
+                  "학생 박서연(학번 20315, 010-1234-5678) 보호자 상담을 6/10 14:00 에 진행합니다.\n"
+                  "회신은 kim@school.kr 로, 신청 링크는 https://forms.gle/abc123 입니다.\n"
+                  "주소: 서울특별시 관악구 봉천로 12 (2층), 문의는 최유나 교감선생님께.")
+
+    def _build_privacy(self) -> QWidget:
+        from src.privacy import model_available
+
+        s = self.config.schedule
+        w = QWidget()
+        lay = QVBoxLayout(w)
+
+        self.mask_pii = QCheckBox("🔒 AI에 보내기 전에 개인정보 가리기 (이름·전화·이메일·주민번호·주소·학번 등 → [이름1] 식 토큰)")
+        self.mask_pii.setChecked(s.mask_pii)
+        self.mask_pii.setToolTip("PC 안에서 가린 뒤 AI 로 보내고, 결과에 남은 토큰은 원문으로 되돌립니다. "
+                                 "캘린더 메모·태스크 하단의 원문은 가리지 않습니다. 이미지 속 글자는 가릴 수 없습니다.")
+        lay.addWidget(self.mask_pii)
+
+        note = QLabel("가린 내용은 <b>이 PC 밖으로 나가지 않습니다</b> — 규칙 기반 마스킹이 내장돼 있고"
+                      + (", 로컬 AI 모델(schift-ko-pii-v6)도 함께 쓰는 중입니다."
+                         if model_available() else
+                         ", 문맥형 인명 탐지 모델(schift-ko-pii-v6)은 선택 설치입니다 (README 참고).")
+                      + "<br>캘린더 설명·태스크 메모에 들어가는 <b>원문은 가리지 않습니다</b> (나중에 확인해야 하니까요).")
+        note.setStyleSheet("color: palette(mid); font-size: 11px;")
+        note.setWordWrap(True)
+        lay.addWidget(note)
+
+        lay.addWidget(QLabel("<b>🧪 제대로 가려지는지 확인</b> — 아래 글을 고쳐 넣고 눌러보세요. AI 에는 오른쪽처럼 전달됩니다."))
+        self.pii_input = QPlainTextEdit(self.SAMPLE_PII)
+        self.pii_input.setMaximumHeight(96)
+        lay.addWidget(self.pii_input)
+
+        row = QHBoxLayout()
+        self.btn_pii_test = QPushButton("가려보기")
+        self.btn_pii_test.clicked.connect(self._pii_test)
+        b_sample = QPushButton("예시 되돌리기")
+        b_sample.clicked.connect(lambda: self.pii_input.setPlainText(self.SAMPLE_PII))
+        self.pii_summary = QLabel("")
+        self.pii_summary.setWordWrap(True)
+        row.addWidget(self.btn_pii_test)
+        row.addWidget(b_sample)
+        row.addWidget(self.pii_summary, 1)
+        lay.addLayout(row)
+
+        self.pii_output = QPlainTextEdit()
+        self.pii_output.setReadOnly(True)
+        self.pii_output.setPlaceholderText("여기에 AI 로 전달될 모습이 나옵니다.")
+        lay.addWidget(self.pii_output, 1)
+        return w
+
+    def _pii_test(self) -> None:
+        """실제 파이프라인과 같은 함수로 가려 보고, 되돌리기까지 왕복 검증한다."""
+        from src.privacy import mask_text, restore_text
+
+        text = self.pii_input.toPlainText()
+        if not text.strip():
+            self.pii_summary.setText("가릴 내용을 넣어 주세요.")
+            return
+        self.btn_pii_test.setEnabled(False)
+        try:
+            r = mask_text(text)
+        except Exception as e:  # noqa: BLE001
+            self.pii_summary.setText(f"❌ 마스킹 실패: {e}")
+            self.pii_output.setPlainText("")
+            return
+        finally:
+            self.btn_pii_test.setEnabled(True)
+        self.pii_output.setPlainText(r.masked)
+        engine = "규칙 + 로컬 모델" if r.used_model else "규칙"
+        if not r.count:
+            self.pii_summary.setText(f"가릴 개인정보를 찾지 못했어요 ({engine}). 이대로 AI 에 전달됩니다.")
+            return
+        ok = restore_text(r.masked, r.mapping) == text
+        self.pii_summary.setText(
+            f"🔒 {r.count}곳을 가렸어요 — {r.summary()} · {engine}"
+            + (" · 되돌리기 확인 ✅" if ok else " · ⚠️ 되돌리기 불일치"))
+        if not self.mask_pii.isChecked():
+            self.pii_summary.setText(self.pii_summary.text() + "  (지금은 기능이 꺼져 있어 실제로는 원문이 전달됩니다)")
+
     def _build_teacher(self) -> QWidget:
         t = self.config.teacher
         w = QWidget()
@@ -492,11 +561,19 @@ class SettingsDialog(QDialog):
         btn.clicked.connect(self._tt_autofill)
         grid.addWidget(btn, 0, Qt.AlignmentFlag.AlignBottom)
         form.addRow("교시 시작", grid)
+        tip = QLabel("1교시를 고치면 2~4교시가, 5교시를 고치면 6~7교시가 수업·쉬는 시간에 맞춰 따라옵니다.")
+        tip.setStyleSheet("color: palette(mid); font-size: 11px;")
+        tip.setWordWrap(True)
+        form.addRow("", tip)
 
         row3 = QHBoxLayout()
         self.tt_lunch_start = QTimeEdit(self._qtime(t.lunch_start)); self.tt_lunch_start.setDisplayFormat("HH:mm")
         self.tt_lunch_end = QTimeEdit(self._qtime(t.lunch_end)); self.tt_lunch_end.setDisplayFormat("HH:mm")
-        row3.addWidget(self.tt_lunch_start); row3.addWidget(QLabel("~")); row3.addWidget(self.tt_lunch_end); row3.addStretch(1)
+        self.tt_lunch_auto = QCheckBox("자동 (4교시 종료 ~ 5교시 시작)")
+        self.tt_lunch_auto.setChecked(t.lunch_auto)
+        self.tt_lunch_auto.toggled.connect(self._tt_lunch_auto_toggled)
+        row3.addWidget(self.tt_lunch_start); row3.addWidget(QLabel("~")); row3.addWidget(self.tt_lunch_end)
+        row3.addSpacing(10); row3.addWidget(self.tt_lunch_auto); row3.addStretch(1)
         form.addRow("점심시간", row3)
         lay.addLayout(form)
 
@@ -505,11 +582,46 @@ class SettingsDialog(QDialog):
         self.tt_preview.setStyleSheet("color: palette(mid); font-size: 11px;")
         lay.addWidget(self.tt_preview)
         lay.addStretch(1)
-        for wdg in (self.tt_work_start, self.tt_work_end, self.tt_lunch_start, self.tt_lunch_end, *self.tt_periods):
+        for wdg in (self.tt_work_start, self.tt_work_end, self.tt_lunch_start, self.tt_lunch_end):
             wdg.timeChanged.connect(self._tt_preview_update)
-        self.tt_period.valueChanged.connect(self._tt_preview_update)
-        self._tt_preview_update()
+        for i, te in enumerate(self.tt_periods):
+            te.timeChanged.connect(lambda _t, idx=i: self._tt_cascade(idx))
+        self.tt_period.valueChanged.connect(lambda _: self._tt_cascade(None))
+        self.tt_break.valueChanged.connect(lambda _: self._tt_cascade(None))
+        self._tt_syncing = False
+        self._tt_lunch_auto_toggled(self.tt_lunch_auto.isChecked())
         return w
+
+    def _tt_lunch_auto_toggled(self, on: bool) -> None:
+        self.tt_lunch_start.setEnabled(not on)
+        self.tt_lunch_end.setEnabled(not on)
+        if on:
+            self._tt_cascade(None, refill=False)
+        else:
+            self._tt_preview_update()
+
+    def _tt_cascade(self, changed: int | None, refill: bool = True) -> None:
+        """교시(또는 수업/쉬는 시간)를 고치면 뒤 교시와 점심시간을 다시 계산해 위젯에 반영."""
+        if getattr(self, "_tt_syncing", False):
+            return
+        self._tt_syncing = True
+        try:
+            t = self._tt_collect()
+            if refill:
+                t.cascade_all() if changed is None else t.cascade(changed)
+            else:
+                t.sync_lunch()
+            for te, s in zip(self.tt_periods, t.periods):
+                q = self._qtime(s)
+                if te.time() != q:
+                    te.setTime(q)
+            for te, s in ((self.tt_lunch_start, t.lunch_start), (self.tt_lunch_end, t.lunch_end)):
+                q = self._qtime(s)
+                if te.time() != q:
+                    te.setTime(q)
+        finally:
+            self._tt_syncing = False
+        self._tt_preview_update()
 
     def _tt_collect(self) -> cfg.TeacherSettings:
         return cfg.TeacherSettings(
@@ -522,15 +634,20 @@ class SettingsDialog(QDialog):
             periods=[te.time().toString("HH:mm") for te in self.tt_periods],
             lunch_start=self.tt_lunch_start.time().toString("HH:mm"),
             lunch_end=self.tt_lunch_end.time().toString("HH:mm"),
+            lunch_auto=self.tt_lunch_auto.isChecked(),
         )
 
     def _tt_autofill(self):
         t = self._tt_collect()
         t.autofill(first=self.tt_periods[0].time().toString("HH:mm"))
-        for te, s in zip(self.tt_periods, t.periods):
-            te.setTime(self._qtime(s))
-        self.tt_lunch_start.setTime(self._qtime(t.lunch_start))
-        self.tt_lunch_end.setTime(self._qtime(t.lunch_end))
+        self._tt_syncing = True
+        try:
+            for te, s in zip(self.tt_periods, t.periods):
+                te.setTime(self._qtime(s))
+            self.tt_lunch_start.setTime(self._qtime(t.lunch_start))
+            self.tt_lunch_end.setTime(self._qtime(t.lunch_end))
+        finally:
+            self._tt_syncing = False
         self._tt_preview_update()
 
     def _tt_preview_update(self, *_):

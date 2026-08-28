@@ -63,3 +63,46 @@ def test_extractor_masks_prompt_but_keeps_source_and_restores():
     prov2 = FakeProvider([json.dumps({"items": []})])
     Extractor(prov2).extract(ParsedInput(text=text), REF, mask_pii=False)
     assert "김민수" in prov2.calls[0].text
+
+
+# ---------------------------------------------------------------- 설정 '개인정보' 탭 (#55)
+
+def test_settings_privacy_tab_toggle_and_check(tmp_path, monkeypatch):
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    from src import config as cfg
+    from src.ui.settings_dialog import SettingsDialog
+
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
+    QApplication.instance() or QApplication([])
+    c = cfg.Config()
+    dlg = SettingsDialog(c, initial_tab="privacy")
+    assert dlg.tabs.currentIndex() == SettingsDialog.TAB_INDEX["privacy"]
+    assert dlg.tabs.tabText(dlg.tabs.currentIndex()) == "개인정보"
+    assert dlg.mask_pii.isChecked()                       # 기본 켜짐
+
+    # 예시 문장으로 확인 → 무엇이 가려졌는지 요약 + 되돌리기 검증
+    dlg._pii_test()
+    out = dlg.pii_output.toPlainText()
+    assert "김민수" not in out and "010-1234-5678" not in out and "kim@school.kr" not in out
+    assert "[이름1]" in out and "[전화1]" in out
+    assert "곳을 가렸어요" in dlg.pii_summary.text() and "되돌리기 확인 ✅" in dlg.pii_summary.text()
+
+    # 꺼도 확인 기능은 동작하되 "실제로는 원문이 전달된다"고 알려준다
+    dlg.mask_pii.setChecked(False)
+    dlg._pii_test()
+    assert "꺼져 있어" in dlg.pii_summary.text()
+
+    # 가릴 게 없는 문장 / 빈 문장
+    dlg.pii_input.setPlainText("내일 회의는 3층에서 합니다.")
+    dlg._pii_test()
+    assert "찾지 못했어요" in dlg.pii_summary.text()
+    dlg.pii_input.setPlainText("   ")
+    dlg._pii_test()
+    assert "넣어 주세요" in dlg.pii_summary.text()
+
+    dlg._save()
+    assert c.schedule.mask_pii is False                   # 끄기 설정이 저장된다

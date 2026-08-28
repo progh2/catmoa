@@ -78,6 +78,53 @@ class TeacherSettings:
     periods: list = field(default_factory=lambda: ["09:00", "09:55", "10:50", "11:45", "13:30", "14:25", "15:20"])
     lunch_start: str = "12:30"
     lunch_end: str = "13:20"
+    lunch_auto: bool = True                 # 점심 = 4교시 종료 ~ 5교시 시작 으로 자동 계산
+
+    # 점심을 사이에 두고 오전(1~4교시) / 오후(5~7교시) 두 블록. 한 블록 안에서만 뒤 교시가 따라온다.
+    BLOCKS = ((0, 3), (4, 6))
+
+    def _step(self) -> int:
+        return max(1, int(self.period_minutes) + int(self.break_minutes))
+
+    def cascade(self, changed: int = 0) -> None:
+        """`changed`(0-based) 교시를 고치면 **같은 블록의 뒤 교시**를 수업+쉬는 시간으로 다시 채운다.
+
+        1교시를 바꾸면 2~4교시가, 5교시를 바꾸면 6~7교시가 따라온다 (오전이 오후를 밀지는 않는다).
+        """
+        from datetime import datetime, timedelta
+
+        per = (list(self.periods) + ["09:00"] * 7)[:7]
+        for lo, hi in self.BLOCKS:
+            if not lo <= changed <= hi:
+                continue
+            try:
+                t = datetime.strptime(per[changed], "%H:%M")
+            except ValueError:
+                return
+            for i in range(changed + 1, hi + 1):
+                t += timedelta(minutes=self._step())
+                per[i] = t.strftime("%H:%M")
+        self.periods = per
+        self.sync_lunch()
+
+    def cascade_all(self) -> None:
+        """수업/쉬는 시간이 바뀌었을 때 — 두 블록을 각각 첫 교시 기준으로 다시 채운다."""
+        for lo, _ in self.BLOCKS:
+            self.cascade(lo)
+
+    def sync_lunch(self) -> None:
+        """점심시간 = 4교시 종료 ~ 5교시 시작. (lunch_auto 가 꺼져 있으면 손대지 않는다)"""
+        from datetime import datetime, timedelta
+
+        if not self.lunch_auto:
+            return
+        try:
+            end4 = datetime.strptime(self.periods[3], "%H:%M") + timedelta(minutes=int(self.period_minutes))
+            start5 = datetime.strptime(self.periods[4], "%H:%M")
+        except (ValueError, IndexError, TypeError):
+            return
+        self.lunch_start = end4.strftime("%H:%M")
+        self.lunch_end = max(start5, end4).strftime("%H:%M")   # 뒤집히면 0분으로 (설정이 어긋났다는 표시)
 
     def autofill(self, first: str | None = None, lunch_after: int = 4) -> None:
         """1교시 시작 + 수업/쉬는 시간으로 7교시까지 채운다. lunch_after 교시가 끝난 뒤 점심(50분)."""
