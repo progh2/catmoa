@@ -108,6 +108,19 @@ def test_swap_script_single_exe(tmp_path, monkeypatch):
     assert "rmdir" not in text and f'del /f /q "{target}.old"' in text
 
 
+def test_swap_script_windows_headless_safe(tmp_path, monkeypatch):
+    """콘솔 없이 도는 스크립트: timeout 금지, ping 대기, 강제 종료·이동 재시도로 무한 대기 방지."""
+    monkeypatch.setattr(updater.platform, "system", lambda: "Windows")
+    new = tmp_path / "dl" / "catmoa-windows-x86_64.exe"; new.parent.mkdir(); new.write_bytes(b"MZ")
+    target = tmp_path / "catmoa.exe"
+    _, script = updater.make_swap_script(new, target, 4242, tmp_path)
+    text = script.read_text(encoding="utf-8")
+    assert "timeout" not in text and "ping -n 2 127.0.0.1" in text
+    assert "taskkill /PID 4242 /F" in text and "GEQ 60" in text
+    assert ":mv" in text and "GEQ 30" in text and ":fail" in text
+    assert text.count(f'start "" "{target}"') == 2      # 성공/실패 경로 모두 재실행
+
+
 def test_swap_script_generation(tmp_path):
     new_root = tmp_path / "new" / "catmoa"; new_root.mkdir(parents=True)
     target = tmp_path / "install" / "catmoa"; target.mkdir(parents=True)

@@ -170,7 +170,8 @@ class AppController:
                              tasklists=self.tasklists, coolm_watcher=self.coolm)
         dlg.saved.connect(self._on_settings_saved)
         dlg.exec()
-        self.refresh_tasklists()   # 로그인/목록 변경 반영
+        if not getattr(self, "_quitting", False):
+            self.refresh_tasklists()   # 로그인/목록 변경 반영
 
     # ------------------------------------------------------------ 업데이트
     def check_update(self) -> None:
@@ -246,8 +247,24 @@ class AppController:
         self._run_bg(fetch, done, err)
 
     def quit(self) -> None:
-        self.worker.stop(1000)
+        """종료. 업데이트 교체 스크립트가 PID 종료를 기다리므로, 스레드를 정리하고도 안 죽으면 강제 종료한다."""
+        self._quitting = True
+        try:
+            self.coolm.apply_config(cfg.Config(coolm=cfg.CoolmSettings(enabled=False)))
+        except Exception:  # noqa: BLE001
+            pass
+        self.worker.stop(1500)
+        for t in list(self._tasks):
+            t.wait(1500)
+        for d in (self._review,):
+            if d is not None:
+                d.close()
         QApplication.instance().quit()
+        # Qt 루프가 어떤 이유로든 안 끝나면(스레드 잔존 등) 3초 뒤 프로세스를 확실히 끝낸다
+        import os
+        import threading
+
+        threading.Timer(3.0, lambda: os._exit(0)).start()
 
     def show(self) -> None:
         self.cat.show()

@@ -207,15 +207,38 @@ def make_swap_script(new_root: Path, target: Path, pid: int, script_dir: Path) -
             exe = target / "catmoa.exe"
             clean = f'rmdir /s /q "{old}" 2>NUL'
             move_new = f'move "{new_root}" "{target}" >NUL'
+        # 주의: 이 스크립트는 콘솔 없이(CREATE_NO_WINDOW) 돌므로 `timeout` 은 쓸 수 없다(stdin 필요) → ping 으로 대기.
+        # 앱이 60초 안에 안 죽으면 강제 종료, 파일 잠금이 풀릴 때까지 move 를 재시도해 무한 대기를 막는다.
         script.write_text(
             "@echo off\r\n"
-            f":wait\r\ntasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL && (timeout /t 1 /nobreak >NUL & goto wait)\r\n"
+            "setlocal\r\n"
+            "set /a n=0\r\n"
+            ":wait\r\n"
+            f'tasklist /FI "PID eq {pid}" /NH 2>NUL | find "{pid}" >NUL || goto swap\r\n'
+            "set /a n+=1\r\n"
+            f"if %n% GEQ 60 taskkill /PID {pid} /F >NUL 2>&1\r\n"
+            "ping -n 2 127.0.0.1 >NUL\r\n"
+            "goto wait\r\n"
+            ":swap\r\n"
+            "ping -n 2 127.0.0.1 >NUL\r\n"
             f"{clean}\r\n"
-            f'move /y "{target}" "{old}" >NUL\r\n'
+            "set /a m=0\r\n"
+            ":mv\r\n"
+            f'move /y "{target}" "{old}" >NUL 2>&1 && goto mv2\r\n'
+            "set /a m+=1\r\n"
+            "if %m% GEQ 30 goto fail\r\n"
+            "ping -n 2 127.0.0.1 >NUL\r\n"
+            "goto mv\r\n"
+            ":mv2\r\n"
             f"{move_new}\r\n"
             f"{clean}\r\n"
             f'start "" "{exe}"\r\n'
-            f'del "%~f0"\r\n',
+            'del "%~f0"\r\n'
+            "exit /b 0\r\n"
+            ":fail\r\n"
+            f'start "" "{exe}"\r\n'
+            'del "%~f0"\r\n'
+            "exit /b 1\r\n",
             encoding="utf-8",
         )
         return ["cmd", "/c", str(script)], script
@@ -250,7 +273,10 @@ def apply(archive: Path, quit_app: Callable[[], None]) -> None:
     log.info("업데이트 스크립트 실행: %s", script)
     kwargs = {}
     if platform.system() == "Windows":
-        kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        # CREATE_NO_WINDOW: 숨김 콘솔을 만들어 cmd 와 자식(tasklist/find/ping)이 공유 →
+        # DETACHED_PROCESS 를 쓰면 콘솔이 없어서 자식 명령마다 검은 창이 뜬다.
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        kwargs["close_fds"] = True
     else:
         kwargs["start_new_session"] = True
     subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
