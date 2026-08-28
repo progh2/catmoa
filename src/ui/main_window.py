@@ -60,6 +60,7 @@ class AppController:
         self.coolm.new_items.connect(self.on_items)
         self.coolm.error.connect(self._on_coolm_error)
         self.coolm.status.connect(lambda s: log.info("쿨메신저: %s", s))
+        self.coolm.polling.connect(lambda: self.cat.flash("searching"))
         self.coolm.apply_config()
 
         # 시작 후 잠시 뒤 업데이트 확인 (설정에서 끌 수 있음)
@@ -110,7 +111,7 @@ class AppController:
         res = self._pending.popleft()
         ex = res.extraction
         if not ex.items and not ex.warnings:
-            self.cat.face.setToolTip(f"{res.item.short}: 일정을 찾지 못했습니다.")
+            self.cat.flash("empty", f"{res.item.short}: 일정을 찾지 못했습니다.")
             self._show_next_review()
             return
         dlg = ReviewDialog(ex.items, self.config.schedule, source_label=res.item.short,
@@ -198,14 +199,12 @@ class AppController:
 
     def coolm_check_now(self) -> None:
         """우클릭 메뉴 → 쿨메신저 새 쪽지 강제 확인."""
-        self.cat.set_busy(True, "thinking")
-        self.cat.face.setToolTip("쿨메신저 새 쪽지 확인 중…")
+        self.cat.flash("searching", "쿨메신저 새 쪽지 확인 중…")
 
         def done(msgs):
             n = self.coolm.deliver(msgs)
             if not n:
-                self.cat.set_busy(False)
-                self.cat.face.setToolTip("쿨메신저: 새 쪽지가 없습니다.")
+                self.cat.flash("empty", "쿨메신저: 새 쪽지가 없습니다.")
 
         self._run_bg(self.coolm.fetch_now, done, lambda m: self.cat.show_error(f"쿨메신저: {m}"))
 

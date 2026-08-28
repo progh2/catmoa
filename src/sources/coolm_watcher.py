@@ -40,6 +40,7 @@ class CoolmWatcher(QObject):
     new_items = Signal(list)      # list[InputItem]
     error = Signal(str)           # 반복 오류는 한 번만
     status = Signal(str)          # 상태 문구 (툴팁 등)
+    polling = Signal()            # 폴링 시작 (고양이 '서류 찾는' 표정용)
 
     def __init__(self, config: cfg.Config, parent=None):
         super().__init__(parent)
@@ -76,6 +77,7 @@ class CoolmWatcher(QObject):
         c = self.config.coolm
         if not c.enabled:
             return
+        self.polling.emit()
         try:
             with CoolmReader(self.memo_dir()) as r:
                 if self._first_run and c.skip_existing_on_first_run and c.last_message_key == 0:

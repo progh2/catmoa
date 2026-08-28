@@ -13,7 +13,14 @@ macOS `~/Library/Application Support/catmoa/cat/`, Windows `%APPDATA%\catmoa\cat
 | `eating.png` | AI 분석 중 |
 | `happy.png` | 완료 |
 | `error.png` | 오류 |
-| `sleeping.png` | 5분 이상 유휴 |
+| `annoyed.png` | 지원하지 않는 입력을 받음 |
+| `empty.png` | 일정을 찾지 못함 |
+| `searching.png` | 쿨메신저 새 쪽지 확인 중 |
+| `bored.png` | 5분 이상 입력 없음 |
+| `sleeping.png` | 30분 이상 입력 없음 |
+
+현재 파일은 `assets/cat-src/`(원본, git 제외)에서 `python tools/prepare_cat.py` 로 생성한 320px 이미지입니다.
+원본을 바꾸면 그 스크립트를 다시 실행하세요 (매핑은 스크립트의 `MAPPING`).
 
 - PNG, 배경 투명, **모든 파일 같은 캔버스 크기** (예: 256×256). 화면엔 절반 크기(레티나 2x)로 표시되고 폭 220px 를 넘지 않게 축소됩니다.
 - 애니메이션: `eating_1.png`, `eating_2.png`… 처럼 번호를 붙이면 순환 재생 (상태별 재생 간격은 `src/ui/styles.py` 의 `FRAME_MS`).

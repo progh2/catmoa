@@ -20,6 +20,8 @@ def app():
 @pytest.fixture
 def widget(app, tmp_path, monkeypatch):
     monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
+    from src.ui import cat_faces
+    monkeypatch.setattr(cat_faces, "find_cat_dir", lambda: None)   # 텍스트 모드로 고정 (assets/cat 이미지 무시)
     w = CatWidget(cfg.Config())
     yield w
     w.close()

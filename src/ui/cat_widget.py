@@ -26,8 +26,10 @@ FACE_FONT_PX = 20
 log = logging.getLogger(__name__)
 
 BUSY_STATES = {"thinking", "eating"}
-TRANSIENT_MS = {"happy": 2500, "error": 4000}
-SLEEP_AFTER_MS = 5 * 60 * 1000
+TRANSIENT_MS = {"happy": 2500, "error": 4000, "annoyed": 3000, "empty": 3000, "searching": 1500}
+IDLE_STATES = {"idle", "hover", "bored", "sleeping"}
+BORED_AFTER_MS = 5 * 60 * 1000       # 입력 없이 5분 → 지루함
+SLEEP_AFTER_MS = 30 * 60 * 1000      # 30분 → 잠
 
 
 class CatWidget(QWidget):
@@ -106,9 +108,12 @@ class CatWidget(QWidget):
         self._transient = QTimer(self)
         self._transient.setSingleShot(True)
         self._transient.timeout.connect(self._end_transient)
+        self._bored = QTimer(self)
+        self._bored.setSingleShot(True)
+        self._bored.timeout.connect(lambda: self._enter("bored") if self._state == "idle" else None)
         self._sleep = QTimer(self)
         self._sleep.setSingleShot(True)
-        self._sleep.timeout.connect(lambda: self._enter("sleeping"))
+        self._sleep.timeout.connect(lambda: self._enter("sleeping") if self._state in ("idle", "bored") else None)
 
         self._enter("idle")
         self._restore_position()
@@ -133,6 +138,14 @@ class CatWidget(QWidget):
     def show_error(self, message: str = "") -> None:
         self._busy = False
         self._enter("error")
+        if message:
+            self.face.setToolTip(message)
+
+    def flash(self, state: str, message: str = "") -> None:
+        """잠깐 보여주는 표정 (searching/empty/annoyed 등). 바쁜 중엔 무시."""
+        if self._busy and state not in BUSY_STATES:
+            return
+        self._enter(state)
         if message:
             self.face.setToolTip(message)
 
@@ -167,8 +180,10 @@ class CatWidget(QWidget):
         if state in TRANSIENT_MS:
             self._transient.start(TRANSIENT_MS[state])
         if state == "idle":
+            self._bored.start(BORED_AFTER_MS)
             self._sleep.start(SLEEP_AFTER_MS)
-        else:
+        elif state not in ("bored",):
+            self._bored.stop()
             self._sleep.stop()
 
     def _end_transient(self) -> None:
@@ -221,7 +236,7 @@ class CatWidget(QWidget):
 
     # ------------------------------------------------------------ 마우스 / 이동
     def enterEvent(self, event) -> None:
-        if not self._busy and self._state in ("idle", "sleeping"):
+        if not self._busy and self._state in IDLE_STATES:
             self._enter("hover")
         # 호버 중 ⌘V 를 받기 위해 포커스 획득
         self.activateWindow()
@@ -330,7 +345,7 @@ class CatWidget(QWidget):
                 self._enter("thinking")
         else:
             self.unsupported.emit("일정으로 읽을 수 있는 내용이 없습니다 (파일: hwp/hwpx/pdf/이미지, 또는 텍스트·이미지).")
-            self._enter("error")
+            self.flash("annoyed")
 
     def items_from_mime(self, md: QMimeData, source: str = "") -> list[InputItem]:
         """QMimeData → InputItem 목록. 우선순위: 파일 URL > 이미지 > 텍스트."""

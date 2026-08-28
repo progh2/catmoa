@@ -24,6 +24,9 @@ client_secret*.json
 # 테스트 임시 파일
 tests/_tmp/
 
+# 고양이 원본 이미지 (1254px, 수 MB) — 배포용은 tools/prepare_cat.py 로 assets/cat/ 에 생성
+assets/cat-src/
+
 # OS / IDE
 .DS_Store
 Thumbs.db

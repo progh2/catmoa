@@ -12,7 +12,7 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: 이미지 고양이 인프라 완료(#29, 미릴리스). 사용자가 PNG 제작 중 → 받으면 assets/cat/ 에 넣고 v1.4.0 릴리스. 규격: assets/cat/README.md (idle 필수, {state}_N.png 프레임, 같은 캔버스). v1.3.4 릴리스됨(⚙ 제거)
+- intent: v1.4.0 — 이미지 고양이 적용(사용자 원본 11장 → tools/prepare_cat.py 로 assets/cat/ 18파일 320px 생성, 원본은 assets/cat-src/ git 제외). 새 상태: searching(쿨메신저 폴링, 서류 찾는 고양이) / bored(5분 유휴) / empty(일정 없음) / annoyed(미지원 입력); sleeping 은 30분. 쿨메신저 인용 대화 분리(#30) + 달력 힌트 + 지난 항목 제외. 이미지 모드 QSS 는 상태 규칙 뒤에 둬야 투명 유지
 - (이전) v1.3.3 — 사용자 Windows 는 **ARM64(Parallels)**: 업데이터가 arm64 산출물만 찾아 실패 → updater.asset_candidates() 로 x86_64 exe 폴백(x64 에뮬레이션). CI 는 x86_64 만 빌드. ≤1.3.2 Windows 클라이언트는 수동 설치 1회 필요
 - (이전) v1.3.2 — 호버 시 위젯 크기 변동 수정(배지/⚙ 줄 자리 유지 + QFont 직접 지정으로 측정, 창 188×65 고정). v1.3.1 릴리스 성공(dmg/exe/tar.gz). Windows 1.3.1→1.3.2 자동 업데이트 실검증 대기
 - (이전) v1.3.1 태그 발행 — 배포 형식 변경(Windows 단일 exe + macOS dmg) + **Windows 업데이트 스크립트 수정**: DETACHED_PROCESS 가 자식 콘솔 명령마다 검은 창("find 1234")을 띄웠고 `timeout` 이 stdin 없이 실패 → CREATE_NO_WINDOW + ping 대기 + taskkill/이동 재시도, AppController.quit 은 스레드 정리 후 3초 os._exit 폴백. ≤1.3.0 Windows 사용자는 스크립트 버그로 자동 업데이트 불가 → exe 수동 설치 1회 필요

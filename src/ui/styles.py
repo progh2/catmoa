@@ -12,12 +12,17 @@ CAT_FACES: dict[str, list[str]] = {
     "eating":   ["(=^･ω･^=)🍙", "(=^ω^=)🍙", "(=^･ω･^=)🍚", "(=^ω^=) "],
     "happy":    ["(=^◡ω◡^=)♪", "(=^◡ω◡^=)♫"],
     "error":    ["(=×ω×=;)", "(=×ω×=;;)"],
+    "annoyed":  ["(=｀ω´=)", "(=｀ω´=)!"],           # 지원하지 않는 입력
+    "empty":    ["(=･ω･=)?", "(=･ω･=)…"],            # 일정을 못 찾음
+    "searching": ["(=^･ω･^=)🔍", "(=^･ω･^=)📄"],     # 쿨메신저 확인 중
+    "bored":    ["(=－ω－=)…", "(=－ω－=) ~"],          # 오래 유휴
     "sleeping": ["(=^ｰωｰ^=)z", "(=^ｰωｰ^=)zz", "(=^ｰωｰ^=)zzZ"],
 }
 
 FRAME_MS: dict[str, int] = {
-    "idle": 900, "hover": 500, "drag": 300, "thinking": 400,
-    "eating": 350, "happy": 400, "error": 500, "sleeping": 800,
+    "idle": 500, "hover": 500, "drag": 300, "thinking": 400,
+    "eating": 350, "happy": 400, "error": 500, "annoyed": 500, "empty": 700,
+    "searching": 400, "bored": 1200, "sleeping": 800,
 }
 
 STATE_TIPS: dict[str, str] = {
@@ -28,6 +33,10 @@ STATE_TIPS: dict[str, str] = {
     "eating": "분석 중…",
     "happy": "완료!",
     "error": "오류",
+    "annoyed": "이건 못 읽어요 (hwp/hwpx/pdf/이미지/텍스트만)",
+    "empty": "일정을 찾지 못했어요",
+    "searching": "쿨메신저 새 쪽지 찾는 중…",
+    "bored": "심심해요… 뭐든 던져주세요",
     "sleeping": "쉬는 중… (마우스를 올리면 깨어나요)",
 }
 
@@ -39,12 +48,13 @@ QLabel#catFace {{
     border-radius: 18px;
     padding: 10px 16px;
 }}
-QLabel#catFace[mode="image"] {{ background: transparent; border: none; padding: 0; }}
 QLabel#catFace[state="drag"] {{ border-color: #6fbf73; background: rgba(240, 255, 240, 245); }}
 QLabel#catFace[state="eating"], QLabel#catFace[state="thinking"] {{ border-color: #f2a65a; }}
 QLabel#catFace[state="happy"] {{ border-color: #6fbf73; }}
 QLabel#catFace[state="error"] {{ border-color: #e06666; background: rgba(255, 240, 240, 245); }}
 QLabel#catFace[state="sleeping"] {{ color: #8a7d6b; border-color: #d9cdb8; }}
+/* 이미지 모드는 상태와 무관하게 투명 — 상태 규칙보다 뒤에 두어 우선 적용 */
+QLabel#catFace[mode="image"] {{ background: transparent; border: none; padding: 0; }}
 QLabel#updateBadge {{
     font-size: 12px; font-weight: bold; color: white;
     background: #4a90e2; border-radius: 9px; padding: 1px 6px; margin-right: 2px;
