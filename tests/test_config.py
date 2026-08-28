@@ -11,6 +11,7 @@ def isolated_config(tmp_path, monkeypatch):
     monkeypatch.setenv("CATMOA_NO_KEYRING", "1")
     monkeypatch.delenv("CATMOA_GOOGLE_CLIENT_ID", raising=False)
     monkeypatch.delenv("CATMOA_GOOGLE_CLIENT_SECRET", raising=False)
+    monkeypatch.setattr(cfg, "_load_dotenv", lambda: {})   # 개발자의 실제 .env 격리
     yield tmp_path
 
 

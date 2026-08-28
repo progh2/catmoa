@@ -24,10 +24,8 @@ SCOPES = [
 _USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 _REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 
-SUCCESS_HTML = """<html><head><meta charset="utf-8"><title>catmoa</title></head>
-<body style="font-family:sans-serif;text-align:center;padding:60px">
-<h1 style="font-size:48px">(=^◡ω◡^=)♪</h1><h2>catmoa 로그인 완료</h2><p>이 창을 닫고 앱으로 돌아가세요.</p>
-</body></html>"""
+# google_auth_oauthlib 는 성공 메시지를 text/plain 으로 보내므로 HTML 이 아닌 일반 텍스트여야 한다
+SUCCESS_HTML = "(=^◡ω◡^=)♪  catmoa 로그인 완료!  이 창을 닫고 앱으로 돌아가세요."
 
 
 class GoogleAuthError(Exception):
@@ -189,12 +187,16 @@ class GoogleAuth:
         while True:
             resp = svc.calendarList().list(pageToken=page, minAccessRole="writer").execute()
             for c in resp.get("items", []):
-                out.append((c["id"], c.get("summaryOverride") or c.get("summary", c["id"])))
+                name = c.get("summaryOverride") or c.get("summary", c["id"])
+                if c.get("primary"):
+                    out.insert(0, ("primary", f"{name} (기본)"))
+                else:
+                    out.append((c["id"], name))
             page = resp.get("nextPageToken")
             if not page:
                 break
-        out.sort(key=lambda x: (0 if x[0] == "primary" or "@" in x[0] and x[0] == self._email else 1, x[1]))
-        return out
+        head, rest = out[:1] if out and out[0][0] == "primary" else [], out[1:] if out and out[0][0] == "primary" else out
+        return head + sorted(rest, key=lambda x: x[1])
 
     def list_tasklists(self) -> list[tuple[str, str]]:
         svc = self.tasks_service()

@@ -46,6 +46,10 @@ class TasksClient:
             if not page:
                 return None
 
+    def create_tasklist(self, name: str) -> tuple[str, str]:
+        t = self.svc.tasklists().insert(body={"title": name}).execute()
+        return t["id"], t.get("title", name)
+
     def list_open_tasks(self, tasklist_id: str) -> list[dict]:
         out: list[dict] = []
         page = None

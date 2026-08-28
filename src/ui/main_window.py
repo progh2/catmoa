@@ -173,6 +173,15 @@ class AppController:
 
         def err(msg):
             self.cat.show_error(msg)
+            if "목록이 없습니다" in msg:
+                ans = QMessageBox.question(
+                    None, "인박스 가져오기",
+                    f"Google Tasks에 '{name}' 목록이 없습니다.\n지금 만들까요? (휴대폰 Tasks 앱에서 이 목록에 메모를 적어두면 고양이가 가져옵니다)")
+                if ans == QMessageBox.StandardButton.Yes:
+                    self._run_bg(lambda: TasksClient(self.google.tasks_service()).create_tasklist(name),
+                                 lambda r: self.cat.face.setToolTip(f"'{r[1]}' 목록을 만들었습니다. 메모를 적은 뒤 다시 가져오세요."),
+                                 lambda m: self.cat.show_error(m))
+                return
             box = QMessageBox(QMessageBox.Icon.Warning, "인박스 가져오기", msg, parent=None)
             box.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
             box.show()
