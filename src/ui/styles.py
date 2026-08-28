@@ -7,6 +7,11 @@ MONO_FAMILY = "Menlo, Consolas, D2Coding, monospace"
 CAT_FACES: dict[str, list[str]] = {
     "idle":     ["(=^･ω･^=)", "(=^･ω･^=)", "(=^･ω･^=)", "(=^-ω-^=)"],      # 가끔 눈 깜빡
     "hover":    ["(=^･ω･^=)ノ", "(=^･ω･^=)ﾉ"],
+    # 마우스 방향을 쳐다보는 호버 (이미지 모드: hover_tl/tr/bl/br.png, 없으면 hover → idle 폴백)
+    "hover_tl": ["(=^◔ω･^=)", "(=^◔ω･^=)"],
+    "hover_tr": ["(=^･ω◔^=)", "(=^･ω◔^=)"],
+    "hover_bl": ["(=^◡ω･^=)", "(=^◡ω･^=)"],
+    "hover_br": ["(=^･ω◡^=)", "(=^･ω◡^=)"],
     "drag":     ["(=^ﾟωﾟ^=)!", "(=^ﾟωﾟ^=)!!"],
     "thinking": ["(=^･ｰ･^=)?", "(=^･ｰ･^=)？", "(=^･ｰ･^=)?"],
     "eating":   ["(=^･ω･^=)🍙", "(=^ω^=)🍙", "(=^･ω･^=)🍚", "(=^ω^=) "],
@@ -20,7 +25,7 @@ CAT_FACES: dict[str, list[str]] = {
 }
 
 FRAME_MS: dict[str, int] = {
-    "idle": 500, "hover": 500, "drag": 300, "thinking": 400,
+    "idle": 500, "hover": 500, "hover_tl": 800, "hover_tr": 800, "hover_bl": 800, "hover_br": 800, "drag": 300, "thinking": 400,
     "eating": 350, "happy": 400, "error": 500, "annoyed": 500, "empty": 700,
     "searching": 400, "bored": 1200, "sleeping": 800,
 }
@@ -28,6 +33,10 @@ FRAME_MS: dict[str, int] = {
 STATE_TIPS: dict[str, str] = {
     "idle": "파일·이미지·텍스트를 여기에 떨어뜨리거나, 마우스를 올린 채 붙여넣기(⌘V / Ctrl+V)",
     "hover": "붙여넣기: ⌘V / Ctrl+V · 우클릭: 메뉴",
+    "hover_tl": "붙여넣기: ⌘V / Ctrl+V · 우클릭: 메뉴",
+    "hover_tr": "붙여넣기: ⌘V / Ctrl+V · 우클릭: 메뉴",
+    "hover_bl": "붙여넣기: ⌘V / Ctrl+V · 우클릭: 메뉴",
+    "hover_br": "붙여넣기: ⌘V / Ctrl+V · 우클릭: 메뉴",
     "drag": "놓으세요!",
     "thinking": "읽는 중…",
     "eating": "분석 중…",

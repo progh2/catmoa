@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QBuffer, QIODevice, QMimeData, QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QFont, QFontMetrics, QGuiApplication, QImage, QKeySequence, QMouseEvent
+from PySide6.QtGui import QAction, QCursor, QFont, QFontMetrics, QGuiApplication, QImage, QKeySequence, QMouseEvent
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QLabel, QMenu, QVBoxLayout, QWidget
 
 from src import config as cfg
@@ -27,7 +27,8 @@ log = logging.getLogger(__name__)
 
 BUSY_STATES = {"thinking", "eating"}
 TRANSIENT_MS = {"happy": 2500, "error": 4000, "annoyed": 3000, "empty": 3000, "searching": 1500}
-IDLE_STATES = {"idle", "hover", "bored", "sleeping"}
+HOVER_STATES = {"hover", "hover_tl", "hover_tr", "hover_bl", "hover_br"}
+IDLE_STATES = {"idle", "bored", "sleeping"} | HOVER_STATES
 BORED_AFTER_MS = 5 * 60 * 1000       # 입력 없이 5분 → 지루함
 SLEEP_AFTER_MS = 30 * 60 * 1000      # 30분 → 잠
 
@@ -101,6 +102,7 @@ class CatWidget(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAcceptDrops(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setMouseTracking(True)      # 버튼을 누르지 않아도 mouseMoveEvent (시선 추적)
         self.setStyleSheet(WIDGET_QSS)
 
         # ---- 레이아웃: [배지 ⚙] 위 줄, 얼굴 아래 줄
@@ -247,7 +249,7 @@ class CatWidget(QWidget):
         if self._busy:
             self._enter("eating")
         elif self.underMouse():
-            self._enter("hover")
+            self._enter(self.hover_state_for(self.mapFromGlobal(QCursor.pos())))
         else:
             self._enter("idle")
 
@@ -292,16 +294,28 @@ class CatWidget(QWidget):
         self.face.setFixedSize(w + 16 * 2 + 2 * 2 + 12, h + 10 * 2 + 2 * 2)
 
     # ------------------------------------------------------------ 마우스 / 이동
+    def hover_state_for(self, pos) -> str:
+        """위젯 좌표 pos 가 어느 사분면인지 → hover_tl / hover_tr / hover_bl / hover_br (마우스를 쳐다보는 표정)."""
+        cx, cy = self.width() / 2, self.height() / 2
+        v = "t" if pos.y() < cy else "b"
+        h = "l" if pos.x() < cx else "r"
+        return f"hover_{v}{h}"
+
+    def _hover_at(self, pos) -> None:
+        st = self.hover_state_for(pos)
+        if st != self._state:
+            self._enter(st)
+
     def enterEvent(self, event) -> None:
         if not self._busy and self._state in IDLE_STATES:
-            self._enter("hover")
+            self._hover_at(event.position() if hasattr(event, "position") else self.mapFromGlobal(QCursor.pos()))
         # 호버 중 ⌘V 를 받기 위해 포커스 획득
         self.activateWindow()
         self.setFocus(Qt.FocusReason.MouseFocusReason)
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
-        if self._state == "hover":
+        if self._state in HOVER_STATES:
             self._enter("idle")
         super().leaveEvent(event)
 
@@ -316,6 +330,9 @@ class CatWidget(QWidget):
         if self._drag_offset is not None and e.buttons() & Qt.MouseButton.LeftButton:
             self.move(e.globalPosition().toPoint() - self._drag_offset)
             e.accept()
+            return
+        if not self._busy and self._state in HOVER_STATES:
+            self._hover_at(e.position())     # 마우스 방향에 따라 시선 변경
 
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:
         if self._drag_offset is not None:

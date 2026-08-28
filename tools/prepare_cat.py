@@ -34,6 +34,15 @@ MAPPING: dict[str, str] = {
 }
 
 
+# 선택 매핑: 원본이 있을 때만 생성. 여러 후보 표기를 허용 (마우스 방향을 쳐다보는 호버)
+OPTIONAL: dict[str, list[str]] = {
+    "hover_tl": ["왼쪽위", "좌상", "왼쪽 위", "topleft", "top_left", "tl"],
+    "hover_tr": ["오른쪽위", "우상", "오른쪽 위", "topright", "top_right", "tr"],
+    "hover_bl": ["왼쪽아래", "아래왼", "좌하", "왼쪽 아래", "bottomleft", "bottom_left", "bl"],
+    "hover_br": ["오른쪽아래", "아래오른", "우하", "오른쪽 아래", "bottomright", "bottom_right", "br"],
+}
+
+
 def _key(name: str) -> str:
     return "".join(name.split()).lower()
 
@@ -44,6 +53,15 @@ def find_src(label: str) -> Path:
         if want in _key(p.stem):
             return p
     raise FileNotFoundError(f"원본을 찾을 수 없음: {label}")
+
+
+def find_optional(labels: list[str]) -> Path | None:
+    for label in labels:
+        try:
+            return find_src(label)
+        except FileNotFoundError:
+            continue
+    return None
 
 
 def union_bbox(paths: list[Path]) -> tuple[int, int, int, int]:
@@ -67,6 +85,12 @@ def union_bbox(paths: list[Path]) -> tuple[int, int, int, int]:
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     srcs = {state: find_src(label) for state, label in MAPPING.items()}
+    for state, labels in OPTIONAL.items():
+        p = find_optional(labels)
+        if p is not None:
+            srcs[state] = p
+        else:
+            print(f"(선택) {state}: 원본 없음 — 건너뜀")
     box = union_bbox(sorted(set(srcs.values())))
     cache: dict[Path, Image.Image] = {}
     for state, src in srcs.items():

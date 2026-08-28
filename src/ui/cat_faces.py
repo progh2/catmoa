@@ -24,7 +24,7 @@ from src.ui.styles import CAT_FACES
 STATES = list(CAT_FACES.keys())
 DISPLAY_SCALE = 0.5          # 레티나 2x 대응: 256px 원본 → 128px 논리 크기
 MAX_LOGICAL_WIDTH = 220      # 너무 큰 이미지는 이 폭으로 축소
-_FRAME_RE = re.compile(r"^([a-z]+)(?:_(\d+))?\.png$", re.I)
+_FRAME_RE = re.compile(r"^([a-z]+(?:_[a-z]+)?)(?:_(\d+))?\.png$", re.I)   # idle, hover_tr, eating_2, hover_tr_1
 
 
 def bundled_assets_dir() -> Path:
@@ -50,7 +50,12 @@ class CatImageSet:
     source_dir: Path | None = None
 
     def frames_for(self, state: str) -> list[QPixmap]:
-        return self.frames.get(state) or self.frames.get("idle") or []
+        """상태 프레임. 방향 호버(hover_tl 등)는 없으면 hover → idle 순으로 폴백."""
+        if state in self.frames:
+            return self.frames[state]
+        if state.startswith("hover_") and "hover" in self.frames:
+            return self.frames["hover"]
+        return self.frames.get("idle") or []
 
 
 def load_cat_images(directory: Path | None = None, dpr: float = 2.0) -> CatImageSet | None:

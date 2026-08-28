@@ -107,6 +107,35 @@ def test_size_stable_on_hover_and_badges(widget, app):
         assert (widget.width(), widget.height()) == base
 
 
+def test_hover_looks_toward_mouse(widget, app):
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QEnterEvent
+    widget.show(); app.processEvents()
+    w, h = widget.width(), widget.height()
+    assert widget.hover_state_for(QPointF(1, 1)) == "hover_tl"
+    assert widget.hover_state_for(QPointF(w - 1, 1)) == "hover_tr"
+    assert widget.hover_state_for(QPointF(1, h - 1)) == "hover_bl"
+    assert widget.hover_state_for(QPointF(w - 1, h - 1)) == "hover_br"
+    widget.enterEvent(QEnterEvent(QPointF(w - 1, 1), QPointF(w - 1, 1), QPointF(w - 1, 1)))
+    assert widget.state == "hover_tr"
+    widget._hover_at(QPointF(1, h - 1))
+    assert widget.state == "hover_bl" and (widget.width(), widget.height()) == (w, h)
+    widget.leaveEvent(None)
+    assert widget.state == "idle"
+
+
+def test_image_set_hover_fallback(app, tmp_path):
+    from PIL import Image
+    from src.ui import cat_faces
+    d = tmp_path / "cat"; d.mkdir()
+    for n in ("idle", "hover", "hover_tr"):
+        Image.new("RGBA", (64, 64), (255, 0, 0, 255)).save(d / f"{n}.png")
+    s = cat_faces.load_cat_images(d)
+    assert s.frames_for("hover_tr") is s.frames["hover_tr"]
+    assert s.frames_for("hover_bl") is s.frames["hover"]        # 방향 이미지 없으면 hover
+    assert s.frames_for("eating") is s.frames["idle"]
+
+
 def test_deliver_emits(widget):
     got = []
     widget.items_received.connect(got.append)
