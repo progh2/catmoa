@@ -84,6 +84,27 @@ def test_state_transitions(widget):
     assert widget.badge.isHidden()
 
 
+def test_size_stable_on_hover_and_badges(widget, app):
+    widget.show()
+    app.processEvents()
+    base = (widget.width(), widget.height())
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QEnterEvent
+    widget.enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
+    app.processEvents()
+    assert not widget.gear.isHidden() and (widget.width(), widget.height()) == base
+    widget.set_queue_size(9)
+    widget.set_update_available("9.9.9")
+    app.processEvents()
+    assert (widget.width(), widget.height()) == base
+    widget.leaveEvent(None)
+    for st in ("thinking", "eating", "happy", "error", "sleeping"):
+        widget._enter(st)
+        widget._tick()
+        app.processEvents()
+        assert (widget.width(), widget.height()) == base
+
+
 def test_deliver_emits(widget):
     got = []
     widget.items_received.connect(got.append)

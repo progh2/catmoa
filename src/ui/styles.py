@@ -33,8 +33,6 @@ STATE_TIPS: dict[str, str] = {
 
 WIDGET_QSS = f"""
 QLabel#catFace {{
-    font-family: {MONO_FAMILY};
-    font-size: 20px;
     color: #3a2e1e;
     background: rgba(255, 250, 240, 240);
     border: 2px solid #f0c27b;

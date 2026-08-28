@@ -12,13 +12,15 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QBuffer, QIODevice, QMimeData, QPoint, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QGuiApplication, QImage, QKeySequence, QMouseEvent
+from PySide6.QtGui import QAction, QFont, QFontMetrics, QGuiApplication, QImage, QKeySequence, QMouseEvent
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QLabel, QMenu, QVBoxLayout, QWidget
 
 from src import config as cfg
 from src.parsers import is_supported
 from src.pipeline.items import InputItem
-from src.ui.styles import CAT_FACES, FRAME_MS, STATE_TIPS, WIDGET_QSS
+from src.ui.styles import CAT_FACES, FRAME_MS, MONO_FAMILY, STATE_TIPS, WIDGET_QSS
+
+FACE_FONT_PX = 20
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +71,12 @@ class CatWidget(QWidget):
         self.update_badge.setCursor(Qt.CursorShape.PointingHandCursor)
         self.update_badge.hide()
         self.update_badge.mousePressEvent = lambda e: self.update_requested.emit()  # type: ignore[assignment]
+        # 숨겨져 있어도 자리를 차지하게 → 호버/배지 표시 때 창 크기가 변하지 않는다
+        for w in (self.badge, self.update_badge, self.gear):
+            sp = w.sizePolicy()
+            sp.setRetainSizeWhenHidden(True)
+            w.setSizePolicy(sp)
+        self.badge.setText("00")          # 자리 확보용 최대 폭 텍스트로 크기 계산
         top.addWidget(self.badge)
         top.addStretch(1)
         top.addWidget(self.update_badge)
@@ -84,6 +92,14 @@ class CatWidget(QWidget):
         root.setSpacing(0)
         root.addLayout(top)
         root.addWidget(self.face)
+        # 위 줄(배지/⚙) 높이를 고정하고 창 전체를 고정 크기로 잠근다
+        top_h = max(self.badge.sizeHint().height(), self.gear.sizeHint().height(), self.update_badge.sizeHint().height())
+        for w in (self.badge, self.update_badge, self.gear):
+            w.setFixedHeight(top_h)
+        self.badge.setText("")
+        # face 는 _fix_face_size 에서 setFixedSize 됨 → 레이아웃 전이라도 minimumWidth/Height 가 확정값
+        fw, fh = self.face.minimumWidth(), self.face.minimumHeight()
+        self.setFixedSize(fw, top_h + fh)
 
         # ---- 타이머
         self._anim = QTimer(self)
@@ -175,8 +191,12 @@ class CatWidget(QWidget):
 
     def _fix_face_size(self) -> None:
         """모든 표정 프레임 중 가장 넓은/높은 것에 맞춰 크기를 고정 → 상태가 바뀌어도 창 크기 불변."""
-        self.face.ensurePolished()
-        fm = self.face.fontMetrics()
+        # 폰트를 코드에서 지정해야 QSS 적용 전에도 정확히 측정된다 (QSS 폰트는 show 이후에나 반영됨)
+        font = QFont()
+        font.setFamilies([f.strip() for f in MONO_FAMILY.split(",")])
+        font.setPixelSize(FACE_FONT_PX)
+        self.face.setFont(font)
+        fm = QFontMetrics(font)
         frames = [f for fs in CAT_FACES.values() for f in fs]
         w = max(fm.horizontalAdvance(f) for f in frames)
         h = fm.height()
