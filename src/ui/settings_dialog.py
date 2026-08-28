@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Callable, Protocol
 
-from PySide6.QtCore import Qt, QThread, QTime, QUrl, Signal
+from PySide6.QtCore import Qt, QThread, QTime, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox,
@@ -85,11 +85,15 @@ class SettingsDialog(QDialog):
 
     def __init__(self, config: cfg.Config, google_auth: GoogleAuthLike | None = None, parent: QWidget | None = None,
                  *, initial_tab: str | None = None, update_info=None, quit_callback: Callable[[], None] | None = None,
-                 tasklists: list[tuple[str, str]] | None = None, coolm_watcher=None):
+                 tasklists: list[tuple[str, str]] | None = None, coolm_watcher=None,
+                 scale_preview: Callable[[float], None] | None = None):
         super().__init__(parent)
         self.config = config
         self.google = google_auth
         self.coolm = coolm_watcher
+        # 고양이 크기 실시간 미리보기 (없으면 저장할 때만 반영)
+        self._scale_preview = scale_preview
+        self._scale_initial = max(0.5, min(3.0, float(config.ui.cat_scale or 1.0)))
         self._tasklists = list(tasklists or [])
         self._tasks: list[_Task] = []
         self._update_info = update_info
@@ -118,6 +122,30 @@ class SettingsDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.addWidget(tabs)
         lay.addWidget(buttons)
+
+    # ------------------------------------------------------------ 고양이 크기 실시간 반영
+    def _on_scale_changed(self, v: int) -> None:
+        self.cat_scale_label.setText(f"{v / 10:.1f}×")
+        if self._scale_preview is not None:
+            self._scale_timer.start()
+
+    def _apply_scale_preview(self) -> None:
+        if self._scale_preview is None:
+            return
+        try:
+            self._scale_preview(self.cat_scale.value() / 10)
+        except RuntimeError:       # 고양이 위젯이 이미 사라진 경우
+            self._scale_preview = None
+
+    def reject(self) -> None:
+        """취소하면 미리보기로 바꾼 크기를 원래대로 되돌린다."""
+        self._scale_timer.stop()
+        if self._scale_preview is not None and abs(self.cat_scale.value() / 10 - self._scale_initial) > 1e-6:
+            try:
+                self._scale_preview(self._scale_initial)
+            except RuntimeError:
+                pass
+        super().reject()
 
     # ------------------------------------------------------------ LLM 탭
     def _build_llm(self) -> QWidget:
@@ -301,7 +329,12 @@ class SettingsDialog(QDialog):
         self.cat_scale.setValue(int(round(max(0.5, min(3.0, self.config.ui.cat_scale)) * 10)))
         self.cat_scale_label = QLabel()
         self.cat_scale_label.setMinimumWidth(44)
-        self.cat_scale.valueChanged.connect(lambda v: self.cat_scale_label.setText(f"{v / 10:.1f}×"))
+        # 슬라이더를 움직이는 즉시 고양이에 반영. 이미지 18장을 다시 스케일하므로 120ms 모아서 한 번만.
+        self._scale_timer = QTimer(self)
+        self._scale_timer.setSingleShot(True)
+        self._scale_timer.setInterval(120)
+        self._scale_timer.timeout.connect(self._apply_scale_preview)
+        self.cat_scale.valueChanged.connect(self._on_scale_changed)
         self.cat_scale_label.setText(f"{self.cat_scale.value() / 10:.1f}×")
         b_reset = QPushButton("1.0×")
         b_reset.setToolTip("기본 크기로")
@@ -310,6 +343,10 @@ class SettingsDialog(QDialog):
         srow.addWidget(self.cat_scale_label)
         srow.addWidget(b_reset)
         form.addRow("고양이 크기", srow)
+        hint = QLabel("슬라이더를 움직이면 고양이가 바로 커지고 작아져요. 취소하면 원래 크기로 돌아갑니다.")
+        hint.setStyleSheet("color: palette(mid); font-size: 11px;")
+        hint.setWordWrap(True)
+        form.addRow("", hint)
 
         self.autostart = QCheckBox("운영체제 시작(로그인) 시 catmoa 자동 실행")
         try:
@@ -785,6 +822,7 @@ class SettingsDialog(QDialog):
 
     # ------------------------------------------------------------ 저장
     def _save(self):
+        self._scale_timer.stop()          # 미리보기 대기 중이면 저장 값이 그대로 반영되므로 취소
         self.config.update.check_on_start = self.update_check_on_start.isChecked()
         c = self.config
         key = self._current_provider_key()

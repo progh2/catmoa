@@ -246,7 +246,8 @@ class AppController:
     def open_settings(self, tab: str | None = None) -> None:
         dlg = SettingsDialog(self.config, google_auth=self.google, parent=None,
                              initial_tab=tab, update_info=self._update_info, quit_callback=self.quit,
-                             tasklists=self.tasklists, coolm_watcher=self.coolm)
+                             tasklists=self.tasklists, coolm_watcher=self.coolm,
+                             scale_preview=self.cat.set_scale)   # 슬라이더를 움직이는 즉시 반영
         dlg.saved.connect(self._on_settings_saved)
         dlg.exec()
         if not getattr(self, "_quitting", False):

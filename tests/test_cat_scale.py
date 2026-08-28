@@ -69,3 +69,53 @@ def test_settings_slider_roundtrip(app, tmp_path, monkeypatch):
     dlg._save()
     assert cfg.Config.load().ui.cat_scale == 2.5
     assert dlg.cat_scale.minimum() == 5 and dlg.cat_scale.maximum() == 30
+
+
+# ---------------------------------------------------------------- 슬라이더 실시간 반영 (#53)
+
+def test_scale_slider_previews_live_and_restores_on_cancel(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
+    from src.ui.settings_dialog import SettingsDialog
+
+    seen: list[float] = []
+    c = cfg.Config()
+    c.ui.cat_scale = 1.0
+    dlg = SettingsDialog(c, scale_preview=seen.append)
+    dlg._scale_timer.setInterval(0)
+
+    dlg.cat_scale.setValue(22)
+    assert dlg.cat_scale_label.text() == "2.2×"
+    assert seen == []                      # 아직 디바운스 대기 (드래그 중 18장 재로딩 방지)
+    dlg._apply_scale_preview()
+    assert seen == [2.2]
+
+    dlg.reject()                           # 취소 → 원래 크기로
+    assert seen == [2.2, 1.0]
+
+
+def test_scale_slider_keeps_value_on_save(app, tmp_path, monkeypatch):
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
+    from src.ui.settings_dialog import SettingsDialog
+
+    seen: list[float] = []
+    c = cfg.Config()
+    dlg = SettingsDialog(c, scale_preview=seen.append)
+    dlg.cat_scale.setValue(5)
+    dlg._apply_scale_preview()
+    dlg._save()
+    assert c.ui.cat_scale == 0.5 and seen == [0.5]      # 저장 후에는 되돌리지 않는다
+
+
+def test_scale_preview_survives_deleted_widget(app, tmp_path, monkeypatch):
+    """고양이 위젯이 먼저 사라져도 설정 창이 죽지 않는다."""
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
+    from src.ui.settings_dialog import SettingsDialog
+
+    def boom(_v):
+        raise RuntimeError("Internal C++ object already deleted.")
+
+    dlg = SettingsDialog(cfg.Config(), scale_preview=boom)
+    dlg.cat_scale.setValue(15)
+    dlg._apply_scale_preview()
+    assert dlg._scale_preview is None
+    dlg.reject()
