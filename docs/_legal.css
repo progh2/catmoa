@@ -1,0 +1,27 @@
+:root { --cream:#fffaf0; --cream-2:#fff3dc; --peach:#ffd9a8; --orange:#f2a65a; --orange-deep:#e08a3a; --brown:#3a2e1e; --brown-soft:#6b5a45; --card:#fff; --shadow:0 10px 30px rgba(120,80,30,.12); }
+* { box-sizing:border-box; }
+body { margin:0; font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif; color:var(--brown); background:radial-gradient(circle at 10% 0,#ffe9c7 0,transparent 40%),var(--cream); line-height:1.7; }
+.wrap { max-width:800px; margin:0 auto; padding:0 20px 60px; }
+header { display:flex; align-items:center; justify-content:space-between; padding:18px 0; }
+.logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px; text-decoration:none; color:var(--brown); }
+.logo img { width:36px; height:36px; border-radius:10px; }
+nav a { margin-left:18px; text-decoration:none; color:var(--brown-soft); font-weight:600; font-size:15px; }
+nav a:hover, a { color:var(--orange-deep); }
+.doc { background:var(--card); border-radius:24px; padding:36px 32px; box-shadow:var(--shadow); margin-top:16px; }
+@media (max-width:600px){ .doc { padding:26px 20px; } }
+h1 { font-size:30px; margin:0 0 4px; letter-spacing:-.02em; }
+.meta { color:var(--brown-soft); font-size:14px; margin:0 0 24px; }
+h2 { font-size:20px; margin:32px 0 8px; padding-left:12px; border-left:4px solid var(--peach); }
+h3 { font-size:16px; margin:18px 0 6px; }
+p, li { color:#4a3d2c; font-size:15.5px; }
+ul, ol { padding-left:22px; }
+li { margin:4px 0; }
+table { width:100%; border-collapse:collapse; font-size:14.5px; margin:10px 0; }
+th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--cream-2); vertical-align:top; }
+th { background:var(--cream); font-weight:700; }
+.box { background:var(--cream); border-radius:14px; padding:14px 18px; margin:12px 0; font-size:14.5px; }
+code { background:var(--cream-2); padding:1px 6px; border-radius:6px; font-size:.92em; }
+.en { margin-top:40px; padding-top:20px; border-top:2px dashed var(--peach); }
+.en h2 { border-color:var(--orange); }
+footer { text-align:center; padding:30px 0 0; color:var(--brown-soft); font-size:14px; }
+footer a { margin:0 6px; }
