@@ -9,8 +9,11 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 
 from src import config as cfg
 from src import updater
+from src.gsync.calendar import CalendarClient
+from src.gsync.dedupe import find_duplicates
 from src.gsync.registrar import Registrar, RegistrationReport
 from src.gsync.tasks import TasksClient
+from src.ui.dedupe_dialog import DedupeDialog
 from src.llm import create_provider
 from src.pipeline.worker import PipelineFailure, PipelineResult, PipelineWorker
 from src.sources.coolm_watcher import CoolmWatcher
@@ -139,6 +142,32 @@ class AppController:
             origin = tuple(res.item.origin_ref.split(":", 1))
         registrar = Registrar(self.google, self.config.schedule,
                               tasklists={name: tid for tid, name in self.tasklists})
+        self.cat.set_busy(True, "thinking")
+        self.cat.face.setToolTip("기존 일정과 중복 확인 중…")
+
+        def check():
+            cal = CalendarClient(self.google.calendar_service()) if any("calendar" in d.targets for d in decisions) else None
+            tk = TasksClient(self.google.tasks_service()) if any("task" in d.targets for d in decisions) else None
+            return find_duplicates(decisions, self.config.schedule, calendar=cal, tasks=tk,
+                                   resolve_tasklist=lambda d: registrar._tasklist_for(d)[0])
+
+        def after_check(result):
+            for e in result.errors:
+                log.warning("중복 검사: %s", e)
+            if result.any:
+                dlg = DedupeDialog(result.matches)
+                if dlg.exec() != DedupeDialog.DialogCode.Accepted:
+                    self.cat.set_busy(False)
+                    self.cat.face.setToolTip("등록을 취소했습니다.")
+                    return
+                for m, choice in zip(result.matches, dlg.choices()):
+                    m.decision.dedupe[m.target] = (choice, m.existing, m.tasklist_id)
+            self._do_register(registrar, decisions, origin)
+
+        self._run_bg(check, after_check, lambda m: (log.warning("중복 검사 실패, 그대로 등록: %s", m),
+                                                    self._do_register(registrar, decisions, origin)))
+
+    def _do_register(self, registrar: Registrar, decisions: list[Decision], origin) -> None:
         self.cat.set_busy(True, "eating")
         self.cat.face.setToolTip("Google에 등록 중…")
         self._run_bg(lambda: registrar.register(decisions, origin_task=origin),

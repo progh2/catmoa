@@ -13,43 +13,50 @@ from src.ui.review_dialog import Decision
 
 # ---------------------------------------------------------------- 가짜 Google 서비스
 
+_DEFAULT_TASKS = [{"id": "t1", "title": "금요일 가정통신문", "status": "needsAction"},
+                  {"id": "t2", "title": "", "status": "needsAction"},
+                  {"id": "t3", "title": "done", "status": "completed"}]
+
+
 class _Call:
-    def __init__(self, store, name, **kw):
-        self.store, self.name, self.kw = store, name, kw
+    def __init__(self, svc, name, **kw):
+        self.svc, self.name, self.kw = svc, name, kw
 
     def execute(self):
-        self.store.append((self.name, self.kw))
+        self.svc.calls.append((self.name, self.kw))
         if self.name == "tasklists.list":
             return {"items": [{"id": "L1", "title": "내 할 일"}, {"id": "L2", "title": "인박스"}]}
         if self.name == "tasks.list":
-            return {"items": [{"id": "t1", "title": "금요일 가정통신문", "status": "needsAction"},
-                              {"id": "t2", "title": "", "status": "needsAction"},
-                              {"id": "t3", "title": "done", "status": "completed"}]}
+            return {"items": self.svc.tasks_data.get(self.kw.get("tasklist"), _DEFAULT_TASKS)}
+        if self.name == "events.list":
+            return {"items": self.svc.events_data}
         if self.name == "events.insert" and self.kw["body"]["summary"] == "FAIL":
             raise RuntimeError("boom")
         return {"id": f"{self.name}-id", "htmlLink": "https://x"}
 
 
 class _Res:
-    def __init__(self, store, prefix):
-        self.store, self.prefix = store, prefix
+    def __init__(self, svc, prefix):
+        self.svc, self.prefix = svc, prefix
 
     def __getattr__(self, method):
-        return lambda **kw: _Call(self.store, f"{self.prefix}.{method}", **kw)
+        return lambda **kw: _Call(self.svc, f"{self.prefix}.{method}", **kw)
 
 
 class FakeService:
-    def __init__(self):
+    def __init__(self, events_data=None, tasks_data=None):
         self.calls = []
+        self.events_data = events_data or []          # events.list 응답
+        self.tasks_data = tasks_data or {}            # tasklist id → tasks.list 응답
 
     def events(self):
-        return _Res(self.calls, "events")
+        return _Res(self, "events")
 
     def tasks(self):
-        return _Res(self.calls, "tasks")
+        return _Res(self, "tasks")
 
     def tasklists(self):
-        return _Res(self.calls, "tasklists")
+        return _Res(self, "tasklists")
 
 
 def _event(**kw):

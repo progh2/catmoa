@@ -65,5 +65,13 @@ class TasksClient:
                 break
         return out
 
+    def update_task(self, tasklist_id: str, task_id: str, item: ScheduleItem) -> dict:
+        """기존 태스크의 마감·메모를 새 항목으로 갱신 (제목은 기존 유지)."""
+        body = task_body(item)
+        patch = {"due": body["due"]}
+        if body.get("notes"):
+            patch["notes"] = body["notes"]
+        return self.svc.tasks().patch(tasklist=tasklist_id or DEFAULT_LIST, task=task_id, body=patch).execute()
+
     def complete_task(self, tasklist_id: str, task_id: str) -> dict:
         return self.svc.tasks().patch(tasklist=tasklist_id, task=task_id, body={"status": "completed"}).execute()

@@ -81,13 +81,26 @@ class Registrar:
         for d in decisions:
             item, when = d.item, d.item.describe_when()
             want_cal, want_task = "calendar" in d.targets, "task" in d.targets
+            cal_dd = d.dedupe.get("calendar")      # (action, existing, tasklist_id) | None
+            task_dd = d.dedupe.get("task")
             try:
                 parts = []
                 if want_task:
                     tid, tname = self._tasklist_for(d)
-                    self.tasks.create_task(item, tid)
-                    parts.append("✅" + (f"[{tname}]" if tname else ""))
-                if want_cal:
+                    if task_dd and task_dd[0] == "skip":
+                        parts.append("⏭✅(중복 건너뜀)")
+                    elif task_dd and task_dd[0] == "update":
+                        self.tasks.update_task(task_dd[2] or tid, task_dd[1]["id"], item)
+                        parts.append("🔄✅(기존 갱신)")
+                    else:
+                        self.tasks.create_task(item, tid)
+                        parts.append("✅" + (f"[{tname}]" if tname else ""))
+                if want_cal and cal_dd and cal_dd[0] == "skip":
+                    parts.append("⏭📅(중복 건너뜀)")
+                elif want_cal and cal_dd and cal_dd[0] == "update":
+                    self.cal.update_event(s.calendar_id, cal_dd[1]["id"], item, d.alarm_minutes)
+                    parts.append("🔄📅(기존 갱신)")
+                elif want_cal:
                     if want_task and item.kind == "task":
                         # 마감일 일정
                         alarm = None
