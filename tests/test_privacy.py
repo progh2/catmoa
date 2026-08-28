@@ -65,6 +65,32 @@ def test_extractor_masks_prompt_but_keeps_source_and_restores():
     assert "김민수" in prov2.calls[0].text
 
 
+# ---------------------------------------------------------------- 직함+이름 / 성씨 게이트 (#57)
+
+def test_name_after_role_is_masked():
+    """'학생 박서연' 처럼 직함이 앞에 오는 이름도 가린다 (이전엔 놓쳤다)."""
+    t = "학생 박서연(학번 20315) 상담. 담임 김민수 선생님, 보호자 최민철 님께 안내."
+    r = mask_text(t, use_model=False)
+    for name in ("박서연", "김민수", "최민철"):
+        assert name not in r.masked, name
+    assert "학생" in r.masked and "담임" in r.masked and "보호자" in r.masked   # 직함은 남는다
+
+
+def test_surname_gate_blocks_context_false_positives():
+    """성씨로 시작하지 않는 낱말은 문맥만으로 이름 처리하지 않는다."""
+    r = mask_text("회신은 kim@school.kr 로 주세요.", use_model=False)
+    assert "회신은" in r.masked and "[이메일1]" in r.masked
+    for t in ("교사 연수 안내", "학생 명단 제출", "학생 안전 교육", "학생 성적 처리",
+              "선생님 여러분께", "학생회 임원 선발", "연락처 010-1111-2222"):
+        m = mask_text(t, use_model=False).masked
+        assert "[이름" not in m, (t, m)
+
+
+def test_surname_gate_still_allows_rare_and_two_char_surnames():
+    assert "남궁민수" not in mask_text("담임 남궁민수 선생님", use_model=False).masked
+    assert "황보라" not in mask_text("저(황보라)가 담당합니다", use_model=False).masked   # 라벨 규칙은 성씨 무관
+
+
 # ---------------------------------------------------------------- 설정 '개인정보' 탭 (#55)
 
 def test_settings_privacy_tab_toggle_and_check(tmp_path, monkeypatch):

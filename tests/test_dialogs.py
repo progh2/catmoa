@@ -153,3 +153,48 @@ def test_settings_maximize_button_and_bigger_font(app, tmp_path, monkeypatch):
     dlg.toggle_maximized()
     assert not dlg.isMaximized()
     dlg.close()
+
+
+def test_settings_no_clipping_at_large_fonts(app, tmp_path, monkeypatch):
+    """글자를 키워도(시스템 13~20pt) 설정 탭의 글자가 잘리거나 가려지지 않는다 (#58)."""
+    from PySide6.QtWidgets import QAbstractSpinBox, QCheckBox, QComboBox, QLabel, QPushButton, QScrollArea
+
+    from src.ui.settings_dialog import SettingsDialog
+
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
+    original = app.font()
+    try:
+        for pt in (13, 17, 20):
+            f = app.font()
+            f.setPointSizeF(pt)
+            app.setFont(f)
+            dlg = SettingsDialog(cfg.Config())
+            dlg.resize(760, 620)
+            dlg.show()
+            app.processEvents()
+            bad = []
+            for i in range(dlg.tabs.count()):
+                dlg.tabs.setCurrentIndex(i)
+                app.processEvents()
+                area = dlg.tabs.widget(i)
+                assert isinstance(area, QScrollArea)          # 모자라면 스크롤로 볼 수 있어야
+                page = area.widget()
+                seen = set()
+                for cls in (QAbstractSpinBox, QComboBox, QPushButton, QCheckBox, QLabel):
+                    for w in page.findChildren(cls):
+                        if id(w) in seen or not w.isVisible():
+                            continue
+                        seen.add(id(w))
+                        if isinstance(w.parent(), (QAbstractSpinBox, QComboBox)):
+                            continue
+                        text = w.text() if hasattr(w, "text") else ""
+                        if isinstance(w, QLabel) and w.wordWrap():
+                            if w.heightForWidth(w.width()) > w.height() + 1:
+                                bad.append(f"{pt}pt {dlg.tabs.tabText(i)} 라벨높이 {text[:30]!r}")
+                            continue
+                        if w.sizeHint().width() > w.width() + 1:
+                            bad.append(f"{pt}pt {dlg.tabs.tabText(i)} 가로 {text[:30]!r}")
+            dlg.close()
+            assert not bad, bad
+    finally:
+        app.setFont(original)

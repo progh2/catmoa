@@ -49,6 +49,17 @@ ROLE_NAME_RE = re.compile(
 LABELED_NAME_RE = re.compile(r"(?:수련지도사|담당자|담당|강사|성명|이름|학생|보호자|학부모|보낸\s*사람|발신자?)[^:\n]{0,18}[:：]\s*\(?\s*(?P<value>[가-힣]{2,4})(?=\s*(?:☎|\d|/|,|\)|\(|$|\s))")
 SELF_NAME_RE = re.compile(r"저\((?P<value>[가-힣]{2,4})\)")
 CONTACT_NAME_RE = re.compile(r"(?<![가-힣])(?P<value>[가-힣]{2,4})(?=\s*(?:01[016789]|0\d{1,2}[-.)]|[A-Za-z0-9._%+-]+@))")
+# 직함이 **앞에** 오는 형태: '학생 박서연', '담임 김민수', '보호자 이영희'
+_ROLE_LEAD = r"(?:수련지도사|담임|학생|보호자|학부모|선생님|선생|교사|교감|교장|부장|주무관|선임|주임|과장|팀장|원장|실장|강사)"
+ROLE_BEFORE_NAME_RE = re.compile(
+    rf"(?:^|[\s(\[·,，、])(?:{_ROLE_LEAD})(?:님)?\s*(?P<value>[가-힣]{{2,4}})(?![가-힣])", re.M)
+
+# 한국 성씨 — 문맥 규칙(직함·연락처 근처)이 잡은 후보가 사람 이름인지 가르는 마지막 관문.
+# '회신은', '연수', '명단' 처럼 성씨로 시작하지 않는 낱말을 걸러 오탐을 크게 줄인다.
+SURNAMES_2 = {"남궁", "제갈", "황보", "사공", "선우", "서문", "독고", "동방", "어금", "강전", "망절"}
+SURNAMES_1 = set(
+    "김이박최정강조윤장임한오서신권황안송류유전홍고문양손배백허남심노하곽성차주우구민진지엄채원천방공현함변"
+    "염추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용봉사피갈감태빙단야궉평")
 NON_PERSON_WORDS = {"담임", "담당", "수련", "지도사", "선생", "선생님", "교직원", "예방교육", "학년부", "교무부", "학생부", "행정실", "교육청",
                     "관리자", "전체", "여러분", "각반", "각학년", "안내", "요청", "회의", "부장님", "학부모", "보호자",
                     # 직함 앞에 흔히 오는 비인명 (학년·교과·부서·수식어)
@@ -58,7 +69,12 @@ NON_PERSON_WORDS = {"담임", "담당", "수련", "지도사", "선생", "선생
                     "연구", "생활", "안전", "인성", "방과후", "돌봄", "급식", "시설", "교육", "행정", "감사", "존경하는", "친애하는",
                     # 연락처 앞에 흔히 오는 라벨 (이름으로 오인 방지)
                     "연락처", "전화", "전화번호", "휴대폰", "핸드폰", "문의", "문의처", "이메일", "메일", "번호", "대표", "사무실",
-                    "긴급", "비상", "내선", "직통", "팩스", "주소", "우리", "저희", "해당반", "우리반", "전교생", "재학생"}
+                    "긴급", "비상", "내선", "직통", "팩스", "주소", "우리", "저희", "해당반", "우리반", "전교생", "재학생",
+                    # 성씨로 시작하지만 사람 이름이 아닌 흔한 업무 낱말 (직함 뒤/연락처 앞에 자주 온다)
+                    "연수", "명단", "명부", "성적", "지도", "방문", "인원", "임원", "전원", "유의", "배정", "신청", "봉사",
+                    "조회", "제출", "서류", "회신", "문서", "공지", "안건", "심의", "표준", "기간", "기준", "고지", "국내",
+                    "선발", "선정", "선착순", "설문", "도서", "권한", "감염", "예방", "예정", "오전", "오후", "전달", "참가",
+                    "차량", "하교", "등교", "방학", "학사", "임시", "정기", "추가", "확인", "제한", "최종", "우수", "구분"}
 DATE_WITH_HOUR = re.compile(r"20\d{2}-\d{2}-\d{2}(?:[ T]?\d{1,2})?")
 
 
@@ -146,10 +162,14 @@ def contextual(text: str) -> list[dict[str, Any]]:
     for m in URL_RE.finditer(text):
         if PRIVATE_URL_HINT.search(m.group(0)):
             _add(out, m.start(), m.end(), "url", "private_url")
-    for pat, rule in ((ROLE_NAME_RE, "name_before_role"), (LABELED_NAME_RE, "labeled_name"),
-                      (SELF_NAME_RE, "self_name"), (CONTACT_NAME_RE, "name_before_contact")):
+    # need_surname: 문맥만으로 잡은 후보는 성씨로 시작해야 사람 이름으로 본다 (라벨이 붙은 건 그대로 신뢰)
+    for pat, rule, need_surname in ((ROLE_NAME_RE, "name_before_role", True),
+                                    (ROLE_BEFORE_NAME_RE, "name_after_role", True),
+                                    (CONTACT_NAME_RE, "name_before_contact", True),
+                                    (LABELED_NAME_RE, "labeled_name", False),
+                                    (SELF_NAME_RE, "self_name", False)):
         for m in pat.finditer(text):
-            if not _looks_like_name(m.group("value")):
+            if not _looks_like_name(m.group("value"), need_surname):
                 continue
             _add(out, m.start("value"), m.end("value"), "person", rule, 3)
     return out
@@ -159,14 +179,25 @@ _NAME_SUFFIX_RE = re.compile(r"(께서|님께|님|께|씨|이|가|은|는|의|�
 _NOT_NAME_PARTS = ("선생", "학생", "교사", "학년", "담당", "부장", "교감", "교장", "학교", "교육", "부서", "여러분")
 
 
-def _looks_like_name(value: str) -> bool:
-    """직함·조사·호칭이 섞인 단어('선생님께', '학년부장')는 이름이 아니다."""
+def has_surname(value: str) -> bool:
+    """한국 성씨로 시작하는가 (두 글자 성 우선)."""
+    return value[:2] in SURNAMES_2 or value[:1] in SURNAMES_1
+
+
+def _looks_like_name(value: str, need_surname: bool = False) -> bool:
+    """직함·조사·호칭이 섞인 단어('선생님께', '학년부장')는 이름이 아니다.
+
+    need_surname=True 면 성씨로 시작하는 것까지 요구한다 — '회신은 kim@…', '교사 연수' 같은
+    문맥 오탐을 걸러낸다. 라벨('이름: 홍길동')처럼 근거가 확실한 규칙에는 적용하지 않는다.
+    """
     if value in NON_PERSON_WORDS:
         return False
     root = _NAME_SUFFIX_RE.sub("", value)
     if not root or root in NON_PERSON_WORDS or len(root) < 2:
         return False
-    return not any(p in value for p in _NOT_NAME_PARTS)
+    if any(p in value for p in _NOT_NAME_PARTS):
+        return False
+    return has_surname(root) if need_surname else True
 
 
 def all_rules(text: str) -> list[dict[str, Any]]:

@@ -10,9 +10,9 @@ from typing import Callable, Protocol
 from PySide6.QtCore import Qt, QThread, QTime, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGridLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSlider, QSpinBox,
-    QTabWidget, QTimeEdit, QVBoxLayout, QWidget,
+    QScrollArea, QTabWidget, QTimeEdit, QVBoxLayout, QWidget,
 )
 
 from src import autostart
@@ -70,6 +70,33 @@ class _DownloadTask(QThread):
             self.error.emit(str(e))
 
 
+def _scrollable(page: QWidget) -> QWidget:
+    """탭 내용을 스크롤 영역에 담는다 — 글자를 키워도 잘리거나 가려지지 않게."""
+    area = QScrollArea()
+    area.setWidget(page)
+    area.setWidgetResizable(True)
+    area.setFrameShape(QScrollArea.Shape.NoFrame)
+    return area
+
+
+def wrapped(text: str, muted: bool = False) -> QLabel:
+    """긴 설명은 줄바꿈되는 라벨로 — 창이 좁아도 글자가 잘리지 않는다."""
+    lb = QLabel(text)
+    lb.setWordWrap(True)
+    if muted:
+        lb.setStyleSheet("color: palette(mid); font-size: 13px;")
+    return lb
+
+
+def check_with_hint(title: str, hint: str) -> tuple[QCheckBox, QLabel]:
+    """체크박스는 줄바꿈이 안 되므로, 짧은 제목 + 아래 줄바꿈 설명으로 나눈다."""
+    box = QCheckBox(title)
+    box.setToolTip(hint)
+    lb = wrapped(hint, muted=True)
+    lb.setContentsMargins(22, 0, 0, 0)
+    return box, lb
+
+
 def default_coolm_dir() -> str:
     if platform.system() == "Windows":
         base = os.environ.get("LOCALAPPDATA", "")
@@ -110,14 +137,12 @@ class SettingsDialog(QDialog):
         self.resize(760, 620)
 
         tabs = self.tabs = QTabWidget()
-        tabs.addTab(self._build_llm(), "LLM")
-        tabs.addTab(self._build_general(), "일반")
-        tabs.addTab(self._build_rules(), "분류 규칙")
-        tabs.addTab(self._build_privacy(), "개인정보")
-        tabs.addTab(self._build_teacher(), "교사")
-        tabs.addTab(self._build_google(), "Google")
-        tabs.addTab(self._build_coolm(), "쿨메신저")
-        tabs.addTab(self._build_update(), "업데이트")
+        # 글자를 키우면 탭 내용이 창보다 커질 수 있다 → 각 탭을 스크롤 영역에 담아 잘리지 않게
+        for page, title in ((self._build_llm(), "LLM"), (self._build_general(), "일반"),
+                            (self._build_rules(), "분류 규칙"), (self._build_privacy(), "개인정보"),
+                            (self._build_teacher(), "교사"), (self._build_google(), "Google"),
+                            (self._build_coolm(), "쿨메신저"), (self._build_update(), "업데이트")):
+            tabs.addTab(_scrollable(page), title)
         if initial_tab in self.TAB_INDEX:
             tabs.setCurrentIndex(self.TAB_INDEX[initial_tab])
 
@@ -130,8 +155,23 @@ class SettingsDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.addWidget(tabs)
         lay.addWidget(buttons)
+        self._fit_inputs()
 
     # ------------------------------------------------------------ 가독성
+    def _fit_inputs(self) -> None:
+        """탭을 다 만든 뒤(=커진 글자가 상속된 뒤) 콤보/스핀/버튼이 글자를 못 담는 일이 없게 최소 폭을 잡는다.
+
+        위젯을 만드는 시점엔 아직 다이얼로그 글꼴을 물려받기 전이라 sizeHint 가 작게 나온다.
+        """
+        from PySide6.QtWidgets import QAbstractSpinBox
+
+        for cls in (QComboBox, QAbstractSpinBox, QPushButton):
+            for w in self.findChildren(cls):
+                if isinstance(w.parent(), (QComboBox, QAbstractSpinBox)):
+                    continue                      # 내부 편집기는 부모가 책임진다
+                need = w.sizeHint().width()
+                if need > w.minimumWidth():
+                    w.setMinimumWidth(need)
     FONT_SCALE = 1.15          # 50~60대 선생님도 편하게 — 시스템 기본 글자보다 살짝 크게
 
     def _enlarge_font(self) -> None:
@@ -327,6 +367,8 @@ class SettingsDialog(QDialog):
             self.default_target.addItem(label, key)
         keys = ("auto", "calendar", "task", "both")
         self.default_target.setCurrentIndex(keys.index(s.default_target) if s.default_target in keys else 0)
+        self.default_target.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.default_target.setMinimumWidth(self.default_target.sizeHint().width())
         form.addRow("기본 대상", self.default_target)
 
         self.alarm_enabled = QCheckBox("기본으로 알람 켜기")
@@ -337,9 +379,12 @@ class SettingsDialog(QDialog):
         self.alarm_minutes.setSuffix("분 전")
         self.alarm_minutes.setValue(s.alarm_minutes)
         form.addRow("기본 알람 시간", self.alarm_minutes)
-        self.task_alarm_as_event = QCheckBox("태스크 알람은 캘린더 알림 이벤트로 함께 생성 (Google Tasks는 알림을 지원하지 않음)")
+        self.task_alarm_as_event, alarm_hint = check_with_hint(
+            "태스크 알람을 캘린더 알림으로",
+            "Google Tasks 는 알림을 지원하지 않아, 알람이 있는 할 일은 캘린더에 알림 이벤트를 따로 만듭니다.")
         self.task_alarm_as_event.setChecked(s.task_alarm_as_event)
         form.addRow("", self.task_alarm_as_event)
+        form.addRow("", alarm_hint)
         self.source_chars = QSpinBox()
         self.source_chars.setRange(0, 4000)
         self.source_chars.setSingleStep(100)
@@ -400,22 +445,25 @@ class SettingsDialog(QDialog):
         lay = QVBoxLayout(w)
         s = self.config.schedule
 
-        lay.addWidget(QLabel("<b>👤 내 역할</b> — 쪽지·공문이 <i>내</i> 업무인지 판단하는 기준. 비워두면 판정하지 않습니다."))
+        lay.addWidget(wrapped("<b>👤 내 역할</b> — 쪽지·공문이 <i>내</i> 업무인지 판단하는 기준. 비워두면 판정하지 않습니다."))
         self.persona = QLineEdit(s.persona)
         self.persona.setPlaceholderText("예) 중학교 2학년 3반 담임, 정보 교과, 정보부 (에듀테크 담당)")
         lay.addWidget(self.persona)
-        self.skip_irrelevant = QCheckBox("내 업무와 무관하다고 판단되면 등록 제안 없이 알림만 (판단이 불확실하면 검토창에 경고 표시)")
+        self.skip_irrelevant, skip_hint = check_with_hint(
+            "내 업무가 아니면 등록 제안 없이 알림만",
+            "판단이 불확실하면 등록은 하되 검토창에 경고를 표시합니다.")
         self.skip_irrelevant.setChecked(s.skip_irrelevant)
         lay.addWidget(self.skip_irrelevant)
+        lay.addWidget(skip_hint)
 
-        lay.addWidget(QLabel("<b>📅 캘린더 / ✅ 태스크 분류 규칙</b> — AI가 event/task를 나눌 때 기본 규칙보다 우선 적용됩니다."))
+        lay.addWidget(wrapped("<b>📅 캘린더 / ✅ 태스크 분류 규칙</b> — AI가 event/task를 나눌 때 기본 규칙보다 우선 적용됩니다."))
         self.kind_rules = QPlainTextEdit(s.kind_rules)
         self.kind_rules.setPlaceholderText(
             "예)\n- 연수·출장·회의는 항상 캘린더\n- '제출', '취합', '결재'가 들어가면 태스크\n- 학생 상담은 캘린더와 태스크 둘 다\n- 방과후 수업은 제외")
         self.kind_rules.setMaximumHeight(110)
         lay.addWidget(self.kind_rules)
 
-        lay.addWidget(QLabel("<b>✅ 태스크 카테고리(목록) 규칙</b> — 할 일을 어느 Google Tasks 목록에 넣을지 정합니다."))
+        lay.addWidget(wrapped("<b>✅ 태스크 카테고리(목록) 규칙</b> — 할 일을 어느 Google Tasks 목록에 넣을지 정합니다."))
         self.category_rules = QPlainTextEdit(s.category_rules)
         self.category_rules.setPlaceholderText(
             "예)\n- 교육청 공문 관련은 '학교' 목록\n- 담임 업무·학부모 연락은 '담임' 목록\n- 개인 연수·자격증은 '개인' 목록\n- 나머지는 기본 목록")
@@ -477,11 +525,13 @@ class SettingsDialog(QDialog):
         w = QWidget()
         lay = QVBoxLayout(w)
 
-        self.mask_pii = QCheckBox("🔒 AI에 보내기 전에 개인정보 가리기 (이름·전화·이메일·주민번호·주소·학번 등 → [이름1] 식 토큰)")
+        self.mask_pii, mask_hint = check_with_hint(
+            "🔒 AI에 보내기 전에 개인정보 가리기",
+            "이름·전화·이메일·주민번호·주소·학번 등을 [이름1] 같은 토큰으로 바꿔 보내고, "
+            "AI 결과에 남은 토큰은 원문으로 되돌립니다.")
         self.mask_pii.setChecked(s.mask_pii)
-        self.mask_pii.setToolTip("PC 안에서 가린 뒤 AI 로 보내고, 결과에 남은 토큰은 원문으로 되돌립니다. "
-                                 "캘린더 메모·태스크 하단의 원문은 가리지 않습니다. 이미지 속 글자는 가릴 수 없습니다.")
         lay.addWidget(self.mask_pii)
+        lay.addWidget(mask_hint)
 
         note = QLabel("가린 내용은 <b>이 PC 밖으로 나가지 않습니다</b> — 규칙 기반 마스킹이 내장돼 있고"
                       + (", 로컬 AI 모델(schift-ko-pii-v6)도 함께 쓰는 중입니다."
@@ -492,7 +542,7 @@ class SettingsDialog(QDialog):
         note.setWordWrap(True)
         lay.addWidget(note)
 
-        lay.addWidget(QLabel("<b>🧪 제대로 가려지는지 확인</b> — 아래 글을 고쳐 넣고 눌러보세요. AI 에는 오른쪽처럼 전달됩니다."))
+        lay.addWidget(wrapped("<b>🧪 제대로 가려지는지 확인</b> — 아래 글을 고쳐 넣고 눌러보세요. AI 에는 아래처럼 전달됩니다."))
         self.pii_input = QPlainTextEdit(self.SAMPLE_PII)
         self.pii_input.setMaximumHeight(96)
         lay.addWidget(self.pii_input)
@@ -548,9 +598,12 @@ class SettingsDialog(QDialog):
         t = self.config.teacher
         w = QWidget()
         lay = QVBoxLayout(w)
-        self.tt_enabled = QCheckBox("시간표를 AI 해석에 참고 (메시지의 '3교시', '점심시간', '퇴근 전' 등을 시각으로 변환)")
+        self.tt_enabled, tt_hint = check_with_hint(
+            "시간표를 AI 해석에 참고",
+            "메시지의 '3교시', '점심시간', '퇴근(퇴청) 전' 같은 표현을 아래 시각으로 바꿔 해석합니다.")
         self.tt_enabled.setChecked(t.enabled)
         lay.addWidget(self.tt_enabled)
+        lay.addWidget(tt_hint)
 
         form = QFormLayout()
         row = QHBoxLayout()
@@ -574,20 +627,26 @@ class SettingsDialog(QDialog):
         row2.addWidget(QLabel("쉬는 시간")); row2.addWidget(self.tt_break); row2.addStretch(1)
         form.addRow("학교급", row2)
 
+        # 교시 입력: 오전(1~4) / 오후(5~7) 두 줄로 — 글자를 키워도 가로로 잘리지 않는다
         self.tt_periods: list[QTimeEdit] = []
-        grid = QHBoxLayout()
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(2)
         for i in range(7):
             s = t.periods[i] if i < len(t.periods) else "09:00"
             te = QTimeEdit(self._qtime(s)); te.setDisplayFormat("HH:mm")
+            te.setMinimumWidth(te.sizeHint().width())
             self.tt_periods.append(te)
-            col = QVBoxLayout(); col.setSpacing(2)
+            r, c = divmod(i, 4)
             lbl = QLabel(f"{i + 1}교시"); lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            col.addWidget(lbl); col.addWidget(te)
-            grid.addLayout(col)
+            grid.addWidget(lbl, r * 2, c)
+            grid.addWidget(te, r * 2 + 1, c)
         btn = QPushButton("자동 채우기")
         btn.setToolTip("1교시 시작 시각 + 수업/쉬는 시간으로 7교시까지 채우고, 4교시 뒤 점심(50분)을 넣습니다")
+        btn.setMinimumWidth(btn.sizeHint().width())
         btn.clicked.connect(self._tt_autofill)
-        grid.addWidget(btn, 0, Qt.AlignmentFlag.AlignBottom)
+        grid.addWidget(btn, 3, 3, Qt.AlignmentFlag.AlignBottom)
+        grid.setColumnStretch(4, 1)
         form.addRow("교시 시작", grid)
         tip = QLabel("1교시를 고치면 2~4교시가, 5교시를 고치면 6~7교시가 수업·쉬는 시간에 맞춰 따라옵니다.")
         tip.setStyleSheet("color: palette(mid); font-size: 13px;")
