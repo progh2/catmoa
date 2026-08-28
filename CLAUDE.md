@@ -12,7 +12,7 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.3.1 — 배포 형식 변경: Windows 단일 exe(onefile) + macOS dmg, 랜딩 다운로드 링크 releases/latest/download 고정 URL. **태그 v1.3.1 은 아직 안 찍음** (사용자가 `git tag v1.3.1 && git push origin v1.3.1`)
+- intent: v1.3.1 태그 발행(CI 진행) — 배포 형식 변경(Windows 단일 exe + macOS dmg) + **Windows 업데이트 스크립트 수정**: DETACHED_PROCESS 가 자식 콘솔 명령마다 검은 창("find 1234")을 띄웠고 `timeout` 이 stdin 없이 실패 → CREATE_NO_WINDOW + ping 대기 + taskkill/이동 재시도, AppController.quit 은 스레드 정리 후 3초 os._exit 폴백. ≤1.3.0 Windows 사용자는 스크립트 버그로 자동 업데이트 불가 → exe 수동 설치 1회 필요
 - v1.3.1 메모: catmoa.spec win32 분기 onefile, build.py make_dmg(hdiutil, Applications 심링크), updater.asset_name_for_platform → dmg/exe/tar.gz, install_root Windows=exe 파일, extract .exe=그대로/.dmg=hdiutil attach→ditto, swap 스크립트 단일 파일 분기. Windows onefile 빌드·교체는 CI/실기기 미검증. ≤1.3.0 클라이언트는 zip 자산이 없어 릴리스 페이지 안내로 폴백(PRD D14). 테스트 125개
 - (이전) v1.3.0 — 쿨메신저 연결 테스트/지금 확인 버튼(#28). 사용자가 Windows(Parallels)에서 실제 쿨메신저로 테스트 중
 - (이전) v1.2.0 릴리스 완료 (#25 위젯 크기 고정, #26 📅+✅ 동시 등록, #27 사용자 분류 규칙·태스크 카테고리)
