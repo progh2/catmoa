@@ -12,6 +12,7 @@ from src.gsync.registrar import Registrar, RegistrationReport
 from src.gsync.tasks import TasksClient
 from src.llm import create_provider
 from src.pipeline.worker import PipelineFailure, PipelineResult, PipelineWorker
+from src.sources.coolm_watcher import CoolmWatcher
 from src.sources.inbox import fetch_inbox_items
 from src.ui.cat_widget import CatWidget
 from src.ui.review_dialog import Decision, ReviewDialog
@@ -46,6 +47,13 @@ class AppController:
         self._review: ReviewDialog | None = None
         self._tasks: list[_Task] = []
         self._boxes: list[QMessageBox] = []
+
+        # 쿨메신저 폴링 (설정에서 켠 경우에만 동작)
+        self.coolm = CoolmWatcher(self.config)
+        self.coolm.new_items.connect(self.on_items)
+        self.coolm.error.connect(self._on_coolm_error)
+        self.coolm.status.connect(lambda s: log.info("쿨메신저: %s", s))
+        self.coolm.apply_config()
 
     # ------------------------------------------------------------ 입력 → 큐
     def on_items(self, items: list) -> None:
@@ -134,7 +142,14 @@ class AppController:
 
     def _on_settings_saved(self, config: cfg.Config) -> None:
         self.config = config
-        log.info("설정 저장: llm=%s/%s", config.llm.provider, config.llm.model)
+        self.cat.config = config
+        self.coolm.apply_config(config)
+        log.info("설정 저장: llm=%s/%s coolm=%s/%ss", config.llm.provider, config.llm.model,
+                 config.coolm.enabled, config.coolm.poll_seconds)
+
+    def _on_coolm_error(self, msg: str) -> None:
+        self.cat.show_error(f"쿨메신저: {msg}")
+        log.warning("쿨메신저 오류: %s", msg)
 
     def import_inbox(self) -> None:
         if not self.google.is_logged_in():

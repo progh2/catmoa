@@ -12,7 +12,7 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v0.1·v0.2 완료(#1~#12) → v0.3 Google 연동 시작
-- changes_made: config, llm/, parsers/, extract/, pipeline/(items·worker), ui/(cat_widget·review_dialog·settings_dialog·main_window AppController). 오프스크린 테스트 69개 + Ollama 실검증(E2E: 텍스트→큐→추출→검토창)
-- decisions: PRD §5 ADR 참조. Ollama `think:false` 필수. ReviewDialog는 item.kind(event/task)→target(calendar/task) 매핑 주의. SettingsDialog는 GoogleAuthLike 프로토콜만 의존(v0.3에서 gsync.auth 주입). 결과 다이얼로그는 deque로 순차 표시. 로컬 Google 테스트는 `.env`(gitignore)에 CATMOA_GOOGLE_CLIENT_ID/SECRET
-- next_steps: #13 OAuth(gsync/auth.py) → #14 Calendar → #15 Tasks → #16 인박스 → Registrar를 AppController.registrar에 연결
+- intent: v0.1~v0.3 완료(#1~#16) → v0.4 쿨메신저 연동
+- changes_made: gsync/(auth·calendar·tasks·registrar), sources/inbox, AppController에 등록/인박스 연결. 테스트 87개. **Google 실제 로그인/등록은 아직 미검증** (.env에 클라이언트 ID 필요)
+- decisions: google-auth 2.57은 expiry 없는 토큰을 즉시 만료 취급(테스트 가짜 토큰에 expiry 필요). 태스크 알람 = 마감일 09:00 30분 이벤트 "⏰ 제목". 인박스 항목 기준일은 태스크 updated 날짜. 등록/인박스 조회는 settings_dialog._Task(QThread)로 백그라운드
+- next_steps: #17 coolm 리더 → #18 폴링 워처 → #19 설정 탭 연결 → v1.0 배포(#20~#22). 사용자가 .env 넣으면 Google 실검증
