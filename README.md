@@ -50,11 +50,15 @@
 ## 설치
 
 ### 실행 파일 (권장)
-[Releases](https://github.com/progh2/catmoa/releases)에서 OS에 맞는 파일을 내려받습니다.
+[Releases](https://github.com/progh2/catmoa/releases)에서 OS에 맞는 파일을 내려받습니다. Python 설치가 필요 없습니다.
 
-- macOS: `catmoa-macos.zip` → 압축 해제 → 처음 실행 시 우클릭 → 열기 (Gatekeeper)
-- Windows: `catmoa-windows.zip` → 압축 해제 → `catmoa.exe` (SmartScreen 경고 시 "추가 정보 → 실행")
-- Linux: `catmoa-linux.tar.gz` → 압축 해제 → `./catmoa`
+| OS | 파일 | 실행 |
+|---|---|---|
+| macOS (Apple Silicon) | `catmoa-macos-arm64.zip` | 압축 해제 → `catmoa.app`을 응용 프로그램 폴더로 → **우클릭 → 열기** (처음 한 번, Gatekeeper). 그래도 막히면 터미널에서 `xattr -cr /Applications/catmoa.app` |
+| Windows 10/11 | `catmoa-windows-x86_64.zip` | 압축 해제 → `catmoa\catmoa.exe`. SmartScreen 경고가 뜨면 **추가 정보 → 실행** |
+| Linux (x86_64) | `catmoa-linux-x86_64.tar.gz` | 압축 해제 → `./catmoa/catmoa`. X11 권장 (Wayland는 항상-위 창이 제한될 수 있음) |
+
+앱은 Dock/작업표시줄에 나타나지 않고 고양이만 화면에 떠 있습니다. 종료는 고양이 **우클릭 → 종료**.
 
 ### 소스에서 실행 (개발)
 ```bash
@@ -91,9 +95,20 @@ Python 3.11 이상이 필요합니다. 가상환경 생성과 의존성 설치�
 
 - 계획·아키텍처: [docs/PRD.md](docs/PRD.md)
 - 진행 상황: [Milestones](https://github.com/progh2/catmoa/milestones) · [Issues](https://github.com/progh2/catmoa/issues)
-- 테스트: `pytest`
-- 빌드 비밀값 (GitHub Secrets): `CATMOA_GOOGLE_CLIENT_ID`, `CATMOA_GOOGLE_CLIENT_SECRET`
-  — Google Cloud Console에서 **데스크톱 앱** 유형 OAuth 클라이언트를 만들어 등록. 로컬 개발 시에는 같은 이름의 환경변수로 대체 가능.
+- 테스트: `pytest` (GUI 테스트는 `QT_QPA_PLATFORM=offscreen`)
+- 로컬 빌드: `pip install pyinstaller && python build.py` → `dist/`
+- 릴리스: `git tag v1.0.0 && git push --tags` → GitHub Actions가 macOS/Windows/Linux를 빌드해 Release에 첨부
+- Google OAuth 클라이언트 (필수, 1회):
+  1. [Google Cloud Console](https://console.cloud.google.com/) → 프로젝트 생성 → **API 및 서비스**에서 *Google Calendar API*, *Google Tasks API* 사용 설정
+  2. OAuth 동의 화면 구성 (테스트 사용자에 사용할 계정 추가) → 사용자 인증 정보 → **OAuth 클라이언트 ID → 데스크톱 앱**
+  3. 발급된 ID/보안 비밀을 저장소 **Settings → Secrets and variables → Actions → Repository secrets**에 등록:
+     `CATMOA_GOOGLE_CLIENT_ID`, `CATMOA_GOOGLE_CLIENT_SECRET`
+  4. 로컬 개발 시에는 프로젝트 루트에 `.env` 파일 (git 제외):
+     ```
+     CATMOA_GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+     CATMOA_GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
+     ```
+  > 데스크톱 앱 클라이언트의 보안 비밀은 Google 정책상 비밀로 취급되지 않으므로 배포 바이너리에 포함해도 됩니다. 앱 검증 전에는 동의 화면의 **테스트 사용자**로 등록된 계정만 로그인할 수 있습니다.
 
 ### 폴더 구조
 ```

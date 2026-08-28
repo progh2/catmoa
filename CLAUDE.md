@@ -12,7 +12,7 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v0.1~v0.3 완료(#1~#16) → v0.4 쿨메신저 연동
-- changes_made: gsync/(auth·calendar·tasks·registrar), sources/inbox, AppController에 등록/인박스 연결. 테스트 87개. **Google 실제 로그인/등록은 아직 미검증** (.env에 클라이언트 ID 필요)
-- decisions: google-auth 2.57은 expiry 없는 토큰을 즉시 만료 취급(테스트 가짜 토큰에 expiry 필요). 태스크 알람 = 마감일 09:00 30분 이벤트 "⏰ 제목". 인박스 항목 기준일은 태스크 updated 날짜. 등록/인박스 조회는 settings_dialog._Task(QThread)로 백그라운드
-- next_steps: #17 coolm 리더 → #18 폴링 워처 → #19 설정 탭 연결 → v1.0 배포(#20~#22). 사용자가 .env 넣으면 Google 실검증
+- intent: v0.1~v0.4 완료(#1~#19), v1.0 배포 진행 (#20·#21 완료, #22 README/릴리스 남음)
+- changes_made: sources/coolm(리더+가짜 udb)·coolm_watcher, build.py·catmoa.spec·tools/make_icon.py·.github/workflows/build.yml. 테스트 93개. 로컬 macOS arm64 빌드·실행 확인. CI workflow_dispatch 트리거함
+- decisions: 워커/워처는 cat 위젯을 parent로 (종료 시 QObject 소유권 경고 방지). 쿨메신저 쪽지의 기준일은 ReceiveDate. macOS 앱은 LSUIElement(Dock 숨김). 산출물명 catmoa-{macos-arm64|windows-x86_64|linux-x86_64}. **Google 실제 로그인/등록 미검증** — .env 필요
+- next_steps: CI 3-OS 빌드 결과 확인 → README 마무리 후 v1.0.0 태그 → Google 실검증(사용자 .env) → 검증 후 필요 시 fix
