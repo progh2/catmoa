@@ -12,7 +12,7 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: 이슈 #1 프로젝트 골격 + README + PRD 작성
-- changes_made: 마일스톤 5개/이슈 22개 GitHub 등록, 골격·문서 작성
-- decisions: PRD §5 ADR 참조 (PySide6, 순수 Python 파서, OAuth 내장, keyring, Tasks 알람=캘린더 이벤트, 쿨메신저 기본 꺼짐)
-- next_steps: #2 설정 모듈 → #3 LLM 어댑터 → #4~6 파서 → #7 추출
+- intent: v0.1 기반 마일스톤 진행 중 (#1~#3 완료)
+- changes_made: 골격·문서(#1), config.py(#2), llm/ 3종 어댑터 + 팩토리(#3, Ollama 실검증 완료)
+- decisions: PRD §5 ADR 참조. Ollama는 `think:false` 필수(thinking 모델이 content를 비움). Claude 기본 모델 `claude-opus-5`. 공급자 생성자는 `client`/`transport` 주입 가능(테스트용)
+- next_steps: #4 PDF 파서 → #5 HWPX → #6 HWP → #7 추출 스키마/프롬프트
