@@ -31,6 +31,7 @@ class CatWidget(QWidget):
     items_received = Signal(list)        # list[InputItem]
     unsupported = Signal(str)            # 사용자 안내 메시지
     settings_requested = Signal()
+    update_requested = Signal()          # ⬆ 배지 클릭 → 설정의 업데이트 탭
     inbox_requested = Signal()
     quit_requested = Signal()
 
@@ -63,8 +64,13 @@ class CatWidget(QWidget):
         self.gear.setToolTip("설정")
         self.gear.hide()
         self.gear.mousePressEvent = lambda e: self.settings_requested.emit()  # type: ignore[assignment]
+        self.update_badge = QLabel("⬆", objectName="updateBadge")
+        self.update_badge.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_badge.hide()
+        self.update_badge.mousePressEvent = lambda e: self.update_requested.emit()  # type: ignore[assignment]
         top.addWidget(self.badge)
         top.addStretch(1)
+        top.addWidget(self.update_badge)
         top.addWidget(self.gear)
 
         self.face = QLabel(objectName="catFace")
@@ -112,6 +118,14 @@ class CatWidget(QWidget):
         self._enter("error")
         if message:
             self.face.setToolTip(message)
+
+    def set_update_available(self, version: str | None) -> None:
+        """새 버전이 있으면 ⬆ 배지를 항상 표시 (호버와 무관)."""
+        if version:
+            self.update_badge.setToolTip(f"새 버전 v{version} 이 있습니다 — 클릭해서 업데이트")
+            self.update_badge.show()
+        else:
+            self.update_badge.hide()
 
     def set_queue_size(self, n: int) -> None:
         self._queue_size = n

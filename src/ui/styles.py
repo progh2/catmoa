@@ -50,6 +50,11 @@ QLabel#gear {{
     font-size: 14px; color: #8a7d6b; background: transparent; padding: 0 2px;
 }}
 QLabel#gear:hover {{ color: #3a2e1e; }}
+QLabel#updateBadge {{
+    font-size: 12px; font-weight: bold; color: white;
+    background: #4a90e2; border-radius: 9px; padding: 1px 6px; margin-right: 2px;
+}}
+QLabel#updateBadge:hover {{ background: #2f6fc0; }}
 QLabel#badge {{
     font-family: {FONT_FAMILY}; font-size: 11px; font-weight: bold; color: white;
     background: #f2a65a; border-radius: 9px; padding: 1px 6px;

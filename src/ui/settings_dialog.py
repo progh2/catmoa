@@ -6,13 +6,15 @@ import platform
 from pathlib import Path
 from typing import Callable, Protocol
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QThread, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox,
+    QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from src import config as cfg
+from src import updater
 from src.llm import KEY_HELP, PROVIDERS, SECRET_FOR_PROVIDER, create_provider
 from src.llm.base import LLMError
 
@@ -43,6 +45,23 @@ class _Task(QThread):
             self.error.emit(str(e))
 
 
+class _DownloadTask(QThread):
+    """업데이트 산출물 다운로드 (진행률 시그널)."""
+    progress = Signal(int, int)
+    done = Signal(object)      # Path
+    error = Signal(str)
+
+    def __init__(self, info, parent=None):
+        super().__init__(parent)
+        self._info = info
+
+    def run(self):
+        try:
+            self.done.emit(str(updater.download(self._info, lambda d, t: self.progress.emit(d, t))))
+        except Exception as e:  # noqa: BLE001
+            self.error.emit(str(e))
+
+
 def default_coolm_dir() -> str:
     if platform.system() == "Windows":
         base = os.environ.get("LOCALAPPDATA", "")
@@ -54,19 +73,28 @@ def default_coolm_dir() -> str:
 class SettingsDialog(QDialog):
     saved = Signal(object)   # cfg.Config
 
-    def __init__(self, config: cfg.Config, google_auth: GoogleAuthLike | None = None, parent: QWidget | None = None):
+    TAB_INDEX = {"llm": 0, "general": 1, "google": 2, "coolm": 3, "update": 4}
+
+    def __init__(self, config: cfg.Config, google_auth: GoogleAuthLike | None = None, parent: QWidget | None = None,
+                 *, initial_tab: str | None = None, update_info=None, quit_callback: Callable[[], None] | None = None):
         super().__init__(parent)
         self.config = config
         self.google = google_auth
         self._tasks: list[_Task] = []
+        self._update_info = update_info
+        self._update_archive = None
+        self._quit = quit_callback or (lambda: QApplication.instance().quit())
         self.setWindowTitle("catmoa 설정")
         self.setMinimumWidth(560)
 
-        tabs = QTabWidget()
+        tabs = self.tabs = QTabWidget()
         tabs.addTab(self._build_llm(), "LLM")
         tabs.addTab(self._build_general(), "일반")
         tabs.addTab(self._build_google(), "Google")
         tabs.addTab(self._build_coolm(), "쿨메신저")
+        tabs.addTab(self._build_update(), "업데이트")
+        if initial_tab in self.TAB_INDEX:
+            tabs.setCurrentIndex(self.TAB_INDEX[initial_tab])
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Save).setText("저장")
@@ -356,8 +384,105 @@ class SettingsDialog(QDialog):
         if d:
             self.coolm_dir.setText(d)
 
+    # ------------------------------------------------------------ 업데이트 탭
+    def _build_update(self) -> QWidget:
+        from src import __version__
+
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        form = QFormLayout()
+        form.addRow("현재 버전", QLabel(f"v{__version__}" + ("" if updater.is_frozen() else "  (소스 실행 중)")))
+        self.update_status = QLabel("")
+        self.update_status.setWordWrap(True)
+        form.addRow("최신 버전", self.update_status)
+        lay.addLayout(form)
+
+        row = QHBoxLayout()
+        self.btn_update_check = QPushButton("업데이트 확인")
+        self.btn_update_check.clicked.connect(self._update_check)
+        self.btn_update_install = QPushButton("업데이트 설치")
+        self.btn_update_install.setEnabled(False)
+        self.btn_update_install.clicked.connect(self._update_install)
+        self.btn_update_page = QPushButton("릴리스 페이지 열기")
+        self.btn_update_page.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(
+            self._update_info.html_url if self._update_info else updater.RELEASES_PAGE)))
+        row.addWidget(self.btn_update_check)
+        row.addWidget(self.btn_update_install)
+        row.addWidget(self.btn_update_page)
+        row.addStretch(1)
+        lay.addLayout(row)
+
+        self.update_progress = QProgressBar()
+        self.update_progress.setRange(0, 100)
+        self.update_progress.hide()
+        lay.addWidget(self.update_progress)
+
+        self.update_notes = QPlainTextEdit()
+        self.update_notes.setReadOnly(True)
+        self.update_notes.setPlaceholderText("릴리스 노트")
+        self.update_notes.setMaximumHeight(140)
+        lay.addWidget(self.update_notes)
+
+        self.update_check_on_start = QCheckBox("시작할 때 자동으로 업데이트 확인 (고양이 옆에 ⬆ 표시)")
+        self.update_check_on_start.setChecked(self.config.update.check_on_start)
+        lay.addWidget(self.update_check_on_start)
+        lay.addStretch(1)
+
+        if self._update_info:
+            self._show_update_info(self._update_info)
+        return w
+
+    def _show_update_info(self, info):
+        self._update_info = info
+        if info is None:
+            self.update_status.setText("✅ 최신 버전입니다.")
+            self.btn_update_install.setEnabled(False)
+            self.update_notes.setPlainText("")
+            return
+        self.update_status.setText(f"🆕 v{info.version} 사용 가능 ({info.asset_name})")
+        self.update_notes.setPlainText(info.notes or "(릴리스 노트 없음)")
+        self.btn_update_install.setEnabled(updater.is_frozen())
+        if not updater.is_frozen():
+            self.update_status.setText(self.update_status.text() + " — 소스 실행 중이라 자동 설치 불가, `git pull` 하세요")
+
+    def _update_check(self):
+        self.btn_update_check.setEnabled(False)
+        self.update_status.setText("확인 중…")
+        self._run(updater.check_latest,
+                  lambda info: (self._show_update_info(info), self.btn_update_check.setEnabled(True)),
+                  lambda m: (self.update_status.setText(f"❌ {m}"), self.btn_update_check.setEnabled(True)))
+
+    def _update_install(self):
+        info = self._update_info
+        if not info:
+            return
+        self.btn_update_install.setEnabled(False)
+        self.btn_update_check.setEnabled(False)
+        self.update_progress.setValue(0)
+        self.update_progress.show()
+        self.update_status.setText(f"v{info.version} 내려받는 중…")
+        t = _DownloadTask(info, self)
+        t.progress.connect(lambda done, total: self.update_progress.setValue(int(done * 100 / total) if total else 0))
+        t.done.connect(self._update_downloaded)
+        t.error.connect(lambda m: (self.update_status.setText(f"❌ {m}"), self.update_progress.hide(),
+                                   self.btn_update_install.setEnabled(True), self.btn_update_check.setEnabled(True)))
+        t.finished.connect(lambda: self._tasks.remove(t) if t in self._tasks else None)
+        self._tasks.append(t)
+        t.start()
+
+    def _update_downloaded(self, archive):
+        self.update_status.setText("설치 준비 중… 앱이 종료된 뒤 새 버전으로 다시 실행됩니다.")
+        try:
+            updater.apply(Path(archive), self._quit)
+        except updater.UpdateError as e:
+            self.update_status.setText(f"❌ {e}")
+            self.update_progress.hide()
+            self.btn_update_install.setEnabled(True)
+            self.btn_update_check.setEnabled(True)
+
     # ------------------------------------------------------------ 저장
     def _save(self):
+        self.config.update.check_on_start = self.update_check_on_start.isChecked()
         c = self.config
         key = self._current_provider_key()
         c.llm.provider = key

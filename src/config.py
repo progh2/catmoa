@@ -72,11 +72,18 @@ class UISettings:
 
 
 @dataclass
+class UpdateSettings:
+    check_on_start: bool = True
+    skipped_version: str = ""           # "이 버전 건너뛰기"
+
+
+@dataclass
 class Config:
     llm: LLMSettings = field(default_factory=LLMSettings)
     schedule: ScheduleSettings = field(default_factory=ScheduleSettings)
     coolm: CoolmSettings = field(default_factory=CoolmSettings)
     ui: UISettings = field(default_factory=UISettings)
+    update: UpdateSettings = field(default_factory=UpdateSettings)
     version: int = 1
 
     # ---- 저장/복원

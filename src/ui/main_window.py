@@ -4,10 +4,11 @@ from __future__ import annotations
 import logging
 from collections import deque
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 
 from src import config as cfg
+from src import updater
 from src.gsync.registrar import Registrar, RegistrationReport
 from src.gsync.tasks import TasksClient
 from src.llm import create_provider
@@ -33,7 +34,9 @@ class AppController:
         self.cat.items_received.connect(self.on_items)
         self.cat.unsupported.connect(self.on_unsupported)
         self.cat.settings_requested.connect(self.open_settings)
+        self.cat.update_requested.connect(lambda: self.open_settings(tab="update"))
         self.cat.inbox_requested.connect(self.import_inbox)
+        self._update_info = None
         self.cat.quit_requested.connect(self.quit)
 
         # 부모를 위젯으로 두어 종료 시 C++/Python 소유권 충돌("shared QObject was deleted directly")을 막는다
@@ -55,6 +58,10 @@ class AppController:
         self.coolm.error.connect(self._on_coolm_error)
         self.coolm.status.connect(lambda s: log.info("쿨메신저: %s", s))
         self.coolm.apply_config()
+
+        # 시작 후 잠시 뒤 업데이트 확인 (설정에서 끌 수 있음)
+        if self.config.update.check_on_start:
+            QTimer.singleShot(5000, self.check_update)
 
     # ------------------------------------------------------------ 입력 → 큐
     def on_items(self, items: list) -> None:
@@ -136,10 +143,23 @@ class AppController:
         t.start()
 
     # ------------------------------------------------------------ 기타
-    def open_settings(self) -> None:
-        dlg = SettingsDialog(self.config, google_auth=self.google, parent=None)
+    def open_settings(self, tab: str | None = None) -> None:
+        dlg = SettingsDialog(self.config, google_auth=self.google, parent=None,
+                             initial_tab=tab, update_info=self._update_info, quit_callback=self.quit)
         dlg.saved.connect(self._on_settings_saved)
         dlg.exec()
+
+    # ------------------------------------------------------------ 업데이트
+    def check_update(self) -> None:
+        def done(info):
+            self._update_info = info
+            if info and info.version != self.config.update.skipped_version:
+                self.cat.set_update_available(info.version)
+                log.info("새 버전: v%s", info.version)
+            else:
+                self.cat.set_update_available(None)
+
+        self._run_bg(updater.check_latest, done, lambda m: log.info("업데이트 확인 실패: %s", m))
 
     def _on_settings_saved(self, config: cfg.Config) -> None:
         self.config = config
