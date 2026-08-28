@@ -231,7 +231,13 @@ class AppController:
                  config.coolm.enabled, config.coolm.poll_seconds)
 
     def _on_coolm_error(self, msg: str) -> None:
+        self._coolm_fail(msg)
+
+    def _coolm_fail(self, msg: str) -> None:
+        """쿨메신저 조회 실패: 울상 + 사유 토스트 (툴팁만으로는 원인을 알기 어렵다)."""
         self.cat.show_error(f"쿨메신저: {msg}")
+        hint = " — 설정 → 쿨메신저 → 연결 테스트로 경로를 확인하세요" if ("폴더" in msg or "찾을 수 없" in msg) else ""
+        self.toast.show_message(f"쿨메신저 확인 실패: {msg}{hint}", near=self.cat, ms=6000)
         log.warning("쿨메신저 오류: %s", msg)
 
     def coolm_check_now(self) -> None:
@@ -243,7 +249,7 @@ class AppController:
             if not n:
                 self.cat.flash("empty", "쿨메신저: 새 쪽지가 없습니다.")
 
-        self._run_bg(self.coolm.fetch_now, done, lambda m: self.cat.show_error(f"쿨메신저: {m}"))
+        self._run_bg(self.coolm.fetch_now, done, self._coolm_fail)
 
     def import_inbox(self) -> None:
         if not self.google.is_logged_in():

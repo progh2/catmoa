@@ -55,6 +55,21 @@ def test_fetch_now_initial_unread_then_after_key(app, tmp_path, monkeypatch):
     w.deleteLater()
 
 
+def test_default_memo_dir_scans_candidates(tmp_path, monkeypatch):
+    from src.sources.coolm import default_memo_dir
+    for v in ("LOCALAPPDATA", "APPDATA", "PROGRAMDATA", "USERPROFILE"):
+        monkeypatch.delenv(v, raising=False)
+    assert default_memo_dir() == ""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "roaming"))
+    # 관례 경로에 없고 APPDATA 쪽 계정별 하위 폴더에 udb 가 있는 경우
+    create_fake_udb(tmp_path / "roaming" / "CoolMessenger" / "Memo" / "user01", _msgs())
+    assert default_memo_dir() == str(tmp_path / "roaming" / "CoolMessenger" / "Memo" / "user01")
+    # 관례 경로에 생기면 그쪽 우선
+    create_fake_udb(tmp_path / "local" / "CoolMessenger" / "Memo", _msgs())
+    assert default_memo_dir() == str(tmp_path / "local" / "CoolMessenger" / "Memo")
+
+
 def test_settings_buttons_exist(app, tmp_path, monkeypatch):
     monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
     create_fake_udb(tmp_path / "Memo", _msgs())

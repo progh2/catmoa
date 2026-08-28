@@ -112,6 +112,26 @@ def split_recent(body: str) -> tuple[str, str]:
 
 
 def default_memo_dir() -> str:
+    """쿨메신저 Memo 폴더 자동 탐지. 관례 경로 외에 설치 형태별 후보를 훑어 .udb 가 있는 첫 폴더를 고른다."""
+    cands: list[Path] = []
+    for var in ("LOCALAPPDATA", "APPDATA", "PROGRAMDATA", "USERPROFILE"):
+        base = os.environ.get(var, "")
+        if not base:
+            continue
+        for sub in (("CoolMessenger", "Memo"), ("CoolMessenger",), ("Documents", "CoolMessenger", "Memo"),
+                    ("CoolMessenger", "Data", "Memo"), ("Coolmessenger", "Memo")):
+            cands.append(Path(base).joinpath(*sub))
+    for d in cands:
+        try:
+            if d.is_dir() and any(d.glob("*.udb")):
+                return str(d)
+            # 한 단계 아래(계정별 폴더 등)도 확인
+            if d.is_dir():
+                for sub in sorted(p for p in d.iterdir() if p.is_dir()):
+                    if any(sub.glob("*.udb")):
+                        return str(sub)
+        except OSError:
+            continue
     base = os.environ.get("LOCALAPPDATA", "")
     return str(Path(base) / "CoolMessenger" / "Memo") if base else ""
 
