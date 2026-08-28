@@ -24,6 +24,15 @@ from src.ui.styles import CAT_FACES
 STATES = list(CAT_FACES.keys())
 DISPLAY_SCALE = 0.5          # 레티나 2x 대응: 256px 원본 → 128px 논리 크기
 MAX_LOGICAL_WIDTH = 220      # 너무 큰 이미지는 이 폭으로 축소
+MIN_SCALE, MAX_SCALE = 0.5, 10.0   # 고양이 크기 배율 범위 (설정 슬라이더와 동일)
+
+
+def clamp_scale(scale) -> float:
+    try:
+        v = float(scale or 1.0)
+    except (TypeError, ValueError):
+        return 1.0
+    return max(MIN_SCALE, min(MAX_SCALE, v))
 _FRAME_RE = re.compile(r"^([a-z]+(?:_[a-z]+)?)(?:_(\d+))?\.png$", re.I)   # idle, hover_tr, eating_2, hover_tr_1
 
 
@@ -78,7 +87,7 @@ def load_cat_images(directory: Path | None = None, dpr: float = 2.0, scale: floa
     first = QPixmap(str(sorted(grouped["idle"])[0][1]))
     if first.isNull():
         return None
-    scale = max(0.5, min(3.0, float(scale or 1.0)))
+    scale = max(MIN_SCALE, min(MAX_SCALE, float(scale or 1.0)))
     lw = max(24, min(int(first.width() * DISPLAY_SCALE * scale), int(MAX_LOGICAL_WIDTH * scale)))
     lh = max(1, int(first.height() * lw / max(first.width(), 1)))
     out = CatImageSet(logical_size=(lw, lh), source_dir=d)

@@ -18,7 +18,7 @@ from PySide6.QtWidgets import QApplication, QHBoxLayout, QLabel, QMenu, QVBoxLay
 from src import config as cfg
 from src.parsers import is_supported
 from src.pipeline.items import InputItem
-from src.ui.cat_faces import load_cat_images
+from src.ui.cat_faces import MAX_SCALE, MIN_SCALE, clamp_scale, load_cat_images
 from src.ui.styles import CAT_FACES, FRAME_MS, MONO_FAMILY, STATE_TIPS, WIDGET_QSS
 
 FACE_FONT_PX = 20
@@ -102,7 +102,7 @@ class CatWidget(QWidget):
         self._drag_offset: QPoint | None = None
         self._queue_size = 0
         self._busy = False
-        self._scale = max(0.5, min(3.0, float(getattr(config.ui, "cat_scale", 1.0) or 1.0)))
+        self._scale = clamp_scale(getattr(config.ui, "cat_scale", 1.0))
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -280,8 +280,8 @@ class CatWidget(QWidget):
         self._place_update_badge()
 
     def set_scale(self, scale: float) -> None:
-        """고양이 크기 배율 변경 (0.5~3.0). 이미지 재로딩 → 크기 재계산 → 현재 표정 다시 그림."""
-        scale = max(0.5, min(3.0, float(scale or 1.0)))
+        """고양이 크기 배율 변경 (0.5~10.0). 이미지 재로딩 → 크기 재계산 → 현재 표정 다시 그림."""
+        scale = clamp_scale(scale)
         if abs(scale - self._scale) < 1e-6:
             return
         self._scale = scale
@@ -295,6 +295,30 @@ class CatWidget(QWidget):
         self._fix_face_size()
         self._lock_size()
         self._paint()
+        self.keep_on_screen()      # 커지면서 화면 밖으로 나가지 않게
+
+    def screen_area(self):
+        """고양이가 있는(없으면 주 화면) 모니터의 작업 영역."""
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        return screen.availableGeometry() if screen else None
+
+    def keep_on_screen(self, margin: int = 8) -> None:
+        """창이 화면 밖으로 삐져나가면 안쪽으로 당긴다 (크기를 키웠을 때·해상도가 바뀌었을 때).
+
+        화면보다 큰 고양이는 좌상단에 맞춘다 — 그래야 우클릭 메뉴를 부를 곳이 남는다.
+        """
+        geo = self.screen_area()
+        if geo is None:
+            return
+        w, h = self.width(), self.height()
+        x, y = self.x(), self.y()
+        x = min(x, geo.right() - w - margin) if w + 2 * margin <= geo.width() else geo.left() + margin
+        y = min(y, geo.bottom() - h - margin) if h + 2 * margin <= geo.height() else geo.top() + margin
+        x = max(x, geo.left() + margin)
+        y = max(y, geo.top() + margin)
+        if (x, y) != (self.x(), self.y()):
+            self.move(x, y)
+            log.info("고양이가 화면 밖으로 나가 안쪽으로 이동: (%d, %d)", x, y)
 
     def _frame_count(self) -> int:
         if self._images:
@@ -424,6 +448,7 @@ class CatWidget(QWidget):
             else:
                 x, y = 100, 100
         self.move(x, y)
+        self.keep_on_screen()      # 저장된 위치가 지금 화면에 안 맞을 수도 있다
 
     def _save_position(self) -> None:
         p = self.pos()

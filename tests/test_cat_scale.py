@@ -27,7 +27,9 @@ def test_load_images_scale(app, tmp_path):
     assert cat_faces.load_cat_images(tmp_path, scale=1.0).logical_size == (160, 160)
     assert cat_faces.load_cat_images(tmp_path, scale=0.5).logical_size == (80, 80)
     assert cat_faces.load_cat_images(tmp_path, scale=3.0).logical_size == (480, 480)
-    assert cat_faces.load_cat_images(tmp_path, scale=9.0).logical_size == (480, 480)   # 상한 3.0
+    assert cat_faces.load_cat_images(tmp_path, scale=10.0).logical_size == (1600, 1600)
+    assert cat_faces.load_cat_images(tmp_path, scale=99.0).logical_size == (1600, 1600)  # 상한 10.0
+    assert cat_faces.load_cat_images(tmp_path, scale=0.01).logical_size == (80, 80)      # 하한 0.5
 
 
 def test_widget_set_scale_image_mode(app, tmp_path, monkeypatch):
@@ -68,7 +70,7 @@ def test_settings_slider_roundtrip(app, tmp_path, monkeypatch):
     assert dlg.cat_scale_label.text() == "2.5×"
     dlg._save()
     assert cfg.Config.load().ui.cat_scale == 2.5
-    assert dlg.cat_scale.minimum() == 5 and dlg.cat_scale.maximum() == 30
+    assert dlg.cat_scale.minimum() == 5 and dlg.cat_scale.maximum() == 100   # 0.5× ~ 10.0×
 
 
 # ---------------------------------------------------------------- 슬라이더 실시간 반영 (#53)
@@ -119,3 +121,54 @@ def test_scale_preview_survives_deleted_widget(app, tmp_path, monkeypatch):
     dlg._apply_scale_preview()
     assert dlg._scale_preview is None
     dlg.reject()
+
+
+# ---------------------------------------------------------------- 화면 밖으로 안 나가게 (#61)
+
+def test_keep_on_screen_pulls_cat_back(app, tmp_path, monkeypatch):
+    from PySide6.QtCore import QRect
+
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path / "cfg"))
+    _imgs(tmp_path / "cfg" / "cat")
+    w = CatWidget(cfg.Config())
+    w.show(); app.processEvents()
+    monkeypatch.setattr(w, "screen_area", lambda: QRect(0, 0, 1000, 800))
+
+    w.move(900, 700)                       # 오른쪽·아래로 삐져나간 위치
+    w.keep_on_screen()
+    assert w.x() + w.width() <= 1000 and w.y() + w.height() <= 800
+    assert w.x() >= 0 and w.y() >= 0
+
+    w.move(-200, -150)                     # 왼쪽·위로 나간 경우
+    w.keep_on_screen()
+    assert w.x() >= 0 and w.y() >= 0
+
+    inside = (300, 250)                    # 이미 안에 있으면 건드리지 않는다
+    w.move(*inside)
+    w.keep_on_screen()
+    assert (w.x(), w.y()) == inside
+    w.close(); w.deleteLater()
+
+
+def test_growing_cat_moves_inside(app, tmp_path, monkeypatch):
+    """크기를 키워 화면을 넘치면 자동으로 안쪽으로 들어온다."""
+    from PySide6.QtCore import QRect
+
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path / "cfg"))
+    _imgs(tmp_path / "cfg" / "cat")
+    w = CatWidget(cfg.Config())
+    w.show(); app.processEvents()
+    monkeypatch.setattr(w, "screen_area", lambda: QRect(0, 0, 1000, 800))
+
+    start = (800, 590)                     # 1.0× (160px) 일 땐 화면 안
+    w.move(*start)
+    w.keep_on_screen()
+    assert (w.x(), w.y()) == start
+
+    w.set_scale(4.0); app.processEvents()  # 640px 로 커지면 넘친다 → set_scale 안에서 당겨짐
+    assert w.width() == 640
+    assert w.x() + w.width() <= 1000 and w.y() + w.height() <= 800
+
+    w.set_scale(10.0); app.processEvents()  # 화면보다 큰 고양이는 좌상단에 붙인다
+    assert (w.x(), w.y()) == (8, 8)
+    w.close(); w.deleteLater()

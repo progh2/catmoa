@@ -20,6 +20,7 @@ from src import config as cfg
 from src import updater
 from src.llm import KEY_HELP, PROVIDERS, SECRET_FOR_PROVIDER, create_provider
 from src.llm.base import LLMError
+from src.ui.cat_faces import MAX_SCALE, MIN_SCALE, clamp_scale
 
 
 class GoogleAuthLike(Protocol):
@@ -142,7 +143,7 @@ class SettingsDialog(QDialog):
         self.coolm = coolm_watcher
         # 고양이 크기 실시간 미리보기 (없으면 저장할 때만 반영)
         self._scale_preview = scale_preview
-        self._scale_initial = max(0.5, min(3.0, float(config.ui.cat_scale or 1.0)))
+        self._scale_initial = clamp_scale(config.ui.cat_scale)
         self._tasklists = list(tasklists or [])
         self._tasks: list[_Task] = []
         self._update_info = update_info
@@ -419,12 +420,12 @@ class SettingsDialog(QDialog):
 
         srow = QHBoxLayout()
         self.cat_scale = QSlider(Qt.Orientation.Horizontal)
-        self.cat_scale.setRange(5, 30)                     # 0.5× ~ 3.0× (×0.1)
+        self.cat_scale.setRange(int(MIN_SCALE * 10), int(MAX_SCALE * 10))   # 0.5× ~ 10.0× (×0.1)
         self.cat_scale.setSingleStep(1)
         self.cat_scale.setPageStep(5)
         self.cat_scale.setTickInterval(5)
         self.cat_scale.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.cat_scale.setValue(int(round(max(0.5, min(3.0, self.config.ui.cat_scale)) * 10)))
+        self.cat_scale.setValue(int(round(clamp_scale(self.config.ui.cat_scale) * 10)))
         self.cat_scale_label = QLabel()
         self.cat_scale_label.setMinimumWidth(44)
         # 슬라이더를 움직이는 즉시 고양이에 반영. 이미지 18장을 다시 스케일하므로 120ms 모아서 한 번만.
@@ -441,9 +442,8 @@ class SettingsDialog(QDialog):
         srow.addWidget(self.cat_scale_label)
         srow.addWidget(b_reset)
         form.addRow("고양이 크기", srow)
-        hint = QLabel("슬라이더를 움직이면 고양이가 바로 커지고 작아져요. 취소하면 원래 크기로 돌아갑니다.")
-        hint.setStyleSheet("color: palette(mid); font-size: 13px;")
-        hint.setWordWrap(True)
+        hint = wrapped("슬라이더를 움직이면 고양이가 바로 커지고 작아져요 (0.5× ~ 10×). 취소하면 원래 크기로 돌아갑니다.<br>"
+                       "화면 밖으로 넘치면 자동으로 안쪽으로 들어옵니다. 4× 이상은 그림이 조금 흐려질 수 있어요.", muted=True)
         form.addRow("", hint)
 
         self.autostart = QCheckBox("운영체제 시작(로그인) 시 catmoa 자동 실행")
