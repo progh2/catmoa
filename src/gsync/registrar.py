@@ -1,4 +1,11 @@
-"""검토 결과(Decision)를 Google Calendar / Tasks 에 등록한다. 블로킹 — 호출자가 스레드에서 실행."""
+"""검토 결과(Decision)를 Google Calendar / Tasks 에 등록한다. 블로킹 — 호출자가 스레드에서 실행.
+
+대상 조합:
+- 📅만: 캘린더 이벤트 (+알람)
+- ✅만: 태스크 (+ 알람 선택 시 설정에 따라 캘린더 알림 이벤트)
+- 📅+✅: 태스크(할 일) + 캘린더. 항목이 task 성격이면 캘린더엔 "(마감)" 종일 일정,
+        event 성격이면 일반 일정. 종일 마감 일정의 알람은 전날 17:00 (Google 종일 알림 관례).
+"""
 from __future__ import annotations
 
 import logging
@@ -13,7 +20,8 @@ from src.ui.review_dialog import Decision
 
 log = logging.getLogger(__name__)
 
-TASK_ALARM_HOUR = 9   # 종일 태스크의 알림 이벤트 기본 시각
+TASK_ALARM_HOUR = 9            # 태스크 알림 이벤트 기본 시각
+ALL_DAY_DEADLINE_ALARM = 7 * 60  # 종일 마감 일정 알림: 전날 17:00
 
 
 @dataclass
@@ -35,11 +43,13 @@ class RegistrationReport:
 
 class Registrar:
     def __init__(self, auth: GoogleAuth, settings: cfg.ScheduleSettings, *,
-                 calendar: CalendarClient | None = None, tasks: TasksClient | None = None):
+                 calendar: CalendarClient | None = None, tasks: TasksClient | None = None,
+                 tasklists: dict[str, str] | None = None):
         self.auth = auth
         self.settings = settings
         self._cal = calendar
         self._tasks = tasks
+        self.tasklists = tasklists or {}   # 이름 → id (카테고리 매핑)
 
     @property
     def cal(self) -> CalendarClient:
@@ -53,28 +63,51 @@ class Registrar:
             self._tasks = TasksClient(self.auth.tasks_service())
         return self._tasks
 
+    def _tasklist_for(self, d: Decision) -> tuple[str, str]:
+        """(id, 표시명). 우선순위: 검토창 선택 > 항목 category 이름 매핑 > 설정 기본."""
+        if d.tasklist_id:
+            return d.tasklist_id, d.tasklist_name
+        cat = d.item.category
+        if cat:
+            key = "".join(cat.split()).lower()
+            for name, tid in self.tasklists.items():
+                if "".join(name.split()).lower() == key:
+                    return tid, name
+        return self.settings.tasklist_id, ""
+
     def register(self, decisions: list[Decision], *, origin_task: tuple[str, str] | None = None) -> RegistrationReport:
-        """origin_task=(tasklist_id, task_id) 면 성공 후 원본 완료 처리 (설정에 따라)."""
         rep = RegistrationReport()
         s = self.settings
         for d in decisions:
             item, when = d.item, d.item.describe_when()
+            want_cal, want_task = "calendar" in d.targets, "task" in d.targets
             try:
-                if d.target == "calendar":
-                    ev = self.cal.create_event(item, s.calendar_id, d.alarm_minutes)
-                    rep.successes.append(f"📅 {when}  {item.title}")
-                    log.info("캘린더 등록: %s", ev.get("htmlLink", ev.get("id")))
-                else:
-                    self.tasks.create_task(item, s.tasklist_id)
-                    msg = f"✅ {when}  {item.title}"
-                    if d.alarm_minutes is not None and s.task_alarm_as_event:
-                        self.cal.create_event(_alarm_event_item(item), s.calendar_id, d.alarm_minutes,
-                                              title=f"⏰ {item.title}", description_extra="Google Tasks 마감 알림용 이벤트")
-                        msg += "  (+알림 이벤트)"
-                    rep.successes.append(msg)
+                parts = []
+                if want_task:
+                    tid, tname = self._tasklist_for(d)
+                    self.tasks.create_task(item, tid)
+                    parts.append("✅" + (f"[{tname}]" if tname else ""))
+                if want_cal:
+                    if want_task and item.kind == "task":
+                        # 마감일 일정
+                        alarm = None
+                        if d.alarm_minutes is not None:
+                            alarm = ALL_DAY_DEADLINE_ALARM if item.all_day else d.alarm_minutes
+                        self.cal.create_event(item, s.calendar_id, alarm, title=f"{item.title} (마감)",
+                                              description_extra="Google Tasks 할 일의 마감일")
+                        parts.append("📅(마감)")
+                    else:
+                        ev = self.cal.create_event(item, s.calendar_id, d.alarm_minutes)
+                        parts.append("📅")
+                        log.info("캘린더 등록: %s", ev.get("htmlLink", ev.get("id")))
+                elif want_task and d.alarm_minutes is not None and s.task_alarm_as_event:
+                    self.cal.create_event(_alarm_event_item(item), s.calendar_id, d.alarm_minutes,
+                                          title=f"⏰ {item.title}", description_extra="Google Tasks 마감 알림용 이벤트")
+                    parts.append("⏰")
+                rep.successes.append(f"{' '.join(parts)} {when}  {item.title}")
             except GoogleAuthError as e:
                 rep.failures.append(f"{item.title}: {e}")
-                break   # 인증 문제면 나머지도 실패하므로 중단
+                break
             except Exception as e:  # noqa: BLE001
                 log.exception("등록 실패: %s", item.title)
                 rep.failures.append(f"{item.title}: {_friendly(e)}")
@@ -90,10 +123,7 @@ class Registrar:
 
 def _alarm_event_item(item):
     """태스크 알림용 이벤트: 시간이 없으면 마감일 09:00, 30분짜리."""
-    if item.all_day:
-        start = datetime.combine(item.start.date(), time(TASK_ALARM_HOUR, 0))
-    else:
-        start = item.start
+    start = datetime.combine(item.start.date(), time(TASK_ALARM_HOUR, 0)) if item.all_day else item.start
     return item.model_copy(update={"all_day": False, "start": start, "end": None,
                                    "notes": (item.notes or "") + ("\n" if item.notes else "") + "마감 알림"})
 

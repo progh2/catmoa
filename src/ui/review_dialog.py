@@ -1,12 +1,13 @@
 """일정 검토 다이얼로그.
 
-추출된 항목을 행 단위로 보여주고, 항목별로 캘린더⇄태스크 전환·알람·내용 편집을 한 뒤
-[등록]을 누르면 Decision 목록을 돌려준다.
+추출된 항목을 행 단위로 보여주고, 항목별로 📅캘린더 / ✅태스크 체크(둘 다 가능), 태스크 목록(카테고리),
+알람, 내용을 편집한 뒤 [등록]을 누르면 Decision 목록을 돌려준다.
+둘 다 선택하면 캘린더에는 마감(또는 일정)으로, 태스크에는 할 일로 들어간다.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, time
+from dataclasses import dataclass, field
+from datetime import datetime
 
 from PySide6.QtCore import QDate, Qt, QTime, Signal
 from PySide6.QtWidgets import (
@@ -17,34 +18,64 @@ from PySide6.QtWidgets import (
 from src import config as cfg
 from src.extract.schema import ScheduleItem
 
-TARGET_LABELS = {"calendar": "📅 캘린더", "task": "✅ 태스크"}
+DEFAULT_LIST_LABEL = "(기본 목록)"
 
 
 @dataclass
 class Decision:
     item: ScheduleItem
-    target: str                 # "calendar" | "task"
-    alarm_minutes: int | None   # None = 알람 없음
+    targets: set[str] = field(default_factory=set)   # {"calendar", "task"}
+    alarm_minutes: int | None = None                  # None = 알람 없음
+    tasklist_id: str = ""                             # "" = 설정의 기본 목록
+    tasklist_name: str = ""
+
+    @property
+    def target(self) -> str:
+        """대표 대상 (로그/요약용)."""
+        if self.targets == {"calendar", "task"}:
+            return "both"
+        return "calendar" if "calendar" in self.targets else "task"
+
+
+def default_targets(item: ScheduleItem, settings: cfg.ScheduleSettings) -> set[str]:
+    mode = settings.default_target
+    if mode == "calendar":
+        return {"calendar"}
+    if mode == "task":
+        return {"task"}
+    if mode == "both":
+        return {"calendar", "task"}
+    return {"calendar"} if item.kind == "event" else {"task"}
+
+
+def _norm(s: str) -> str:
+    return "".join(s.split()).lower()
 
 
 class _Row(QFrame):
-    def __init__(self, item: ScheduleItem, settings: cfg.ScheduleSettings, parent=None):
+    def __init__(self, item: ScheduleItem, settings: cfg.ScheduleSettings,
+                 tasklists: list[tuple[str, str]], parent=None):
         super().__init__(parent)
         self.item = item
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet("_Row { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; }")
 
-        # ---- 1행: 선택 · 대상 · 제목 · 알람
+        # ---- 1행: 선택 · 📅 · ✅ · 태스크 목록 · 제목 · 알람
         self.check = QCheckBox()
         self.check.setChecked(True)
-        self.target = QComboBox()
-        for key, label in TARGET_LABELS.items():
-            self.target.addItem(label, key)
-        if settings.default_target == "auto":
-            default = "calendar" if item.kind == "event" else "task"
-        else:
-            default = settings.default_target
-        self.target.setCurrentIndex(0 if default == "calendar" else 1)
+        targets = default_targets(item, settings)
+        self.cal = QCheckBox("📅 캘린더")
+        self.cal.setToolTip("캘린더에 등록 (태스크와 함께 선택하면 마감일 일정으로)")
+        self.cal.setChecked("calendar" in targets)
+        self.task = QCheckBox("✅ 태스크")
+        self.task.setToolTip("Google Tasks에 할 일로 등록")
+        self.task.setChecked("task" in targets)
+        self.tasklist = QComboBox()
+        self.tasklist.setToolTip("넣을 태스크 목록 (카테고리)")
+        self.tasklist.addItem(DEFAULT_LIST_LABEL, "")
+        for tid, name in tasklists:
+            self.tasklist.addItem(name, tid)
+        self._preselect_tasklist(item, settings, tasklists)
         self.title = QLineEdit(item.title)
         self.title.setPlaceholderText("제목")
         self.alarm = QCheckBox("알람")
@@ -53,12 +84,12 @@ class _Row(QFrame):
         self.alarm_min.setRange(0, 7 * 24 * 60)
         self.alarm_min.setSuffix("분 전")
         self.alarm_min.setValue(item.alarm_minutes if item.alarm_minutes is not None else settings.alarm_minutes)
-        self.alarm.toggled.connect(self.alarm_min.setEnabled)
-        self.alarm_min.setEnabled(self.alarm.isChecked())
 
         r1 = QHBoxLayout()
         r1.addWidget(self.check)
-        r1.addWidget(self.target)
+        r1.addWidget(self.cal)
+        r1.addWidget(self.task)
+        r1.addWidget(self.tasklist)
         r1.addWidget(self.title, 1)
         r1.addWidget(self.alarm)
         r1.addWidget(self.alarm_min)
@@ -72,7 +103,8 @@ class _Row(QFrame):
         self.time = QTimeEdit(QTime(item.start.hour, item.start.minute))
         self.time.setDisplayFormat("HH:mm")
         end = item.end
-        self.end_time = QTimeEdit(QTime(end.hour, end.minute) if end and not item.all_day else QTime(item.start.hour + 1 if item.start.hour < 23 else 23, item.start.minute))
+        self.end_time = QTimeEdit(QTime(end.hour, end.minute) if end and not item.all_day
+                                  else QTime(min(item.start.hour + 1, 23), item.start.minute))
         self.end_time.setDisplayFormat("HH:mm")
         self.has_end = QCheckBox("종료")
         self.has_end.setChecked(bool(end))
@@ -92,7 +124,7 @@ class _Row(QFrame):
         r2.addWidget(self.end_time)
         r2.addWidget(self.location, 1)
 
-        # ---- 3행: 근거/메모 (작게)
+        # ---- 3행: 근거/메모
         self.notes = QLabel()
         self.notes.setStyleSheet("color: palette(mid); font-size: 11px;")
         self.notes.setWordWrap(True)
@@ -100,6 +132,8 @@ class _Row(QFrame):
         if item.source:
             meta.append(item.source)
         meta.append(f"확신 {int(item.confidence * 100)}%")
+        if item.category:
+            meta.append(f"제안 목록: {item.category}")
         if item.notes:
             meta.append(item.notes)
         self.notes.setText(" · ".join(meta))
@@ -111,17 +145,26 @@ class _Row(QFrame):
         lay.addLayout(r2)
         lay.addWidget(self.notes)
 
-        self.all_day.toggled.connect(self._sync_enabled)
-        self.has_end.toggled.connect(self._sync_enabled)
-        self.check.toggled.connect(self._sync_enabled)
-        self.target.currentIndexChanged.connect(self._sync_enabled)
+        for w in (self.all_day, self.has_end, self.check, self.cal, self.task, self.alarm):
+            w.toggled.connect(self._sync_enabled)
         self._sync_enabled()
+
+    def _preselect_tasklist(self, item, settings, tasklists):
+        want = None
+        if item.category:
+            key = _norm(item.category)
+            want = next((tid for tid, name in tasklists if _norm(name) == key), None)
+        if want is None and settings.tasklist_id:
+            want = settings.tasklist_id
+        idx = self.tasklist.findData(want) if want else -1
+        self.tasklist.setCurrentIndex(idx if idx >= 0 else 0)
 
     def _sync_enabled(self, *_):
         on = self.check.isChecked()
-        for w in (self.target, self.title, self.alarm, self.date, self.all_day, self.time,
+        for w in (self.cal, self.task, self.title, self.alarm, self.date, self.all_day, self.time,
                   self.has_end, self.end_date, self.end_time, self.location):
             w.setEnabled(on)
+        self.tasklist.setEnabled(on and self.task.isChecked())
         if on:
             self.alarm_min.setEnabled(self.alarm.isChecked())
             all_day = self.all_day.isChecked()
@@ -131,11 +174,20 @@ class _Row(QFrame):
         else:
             self.alarm_min.setEnabled(False)
 
-    def set_target(self, key: str):
-        self.target.setCurrentIndex(0 if key == "calendar" else 1)
+    def set_targets(self, targets: set[str]):
+        self.cal.setChecked("calendar" in targets)
+        self.task.setChecked("task" in targets)
+
+    def targets(self) -> set[str]:
+        t = set()
+        if self.cal.isChecked():
+            t.add("calendar")
+        if self.task.isChecked():
+            t.add("task")
+        return t
 
     def decision(self) -> Decision | None:
-        if not self.check.isChecked():
+        if not self.check.isChecked() or not self.targets():
             return None
         d = self.date.date()
         all_day = self.all_day.isChecked()
@@ -148,15 +200,19 @@ class _Row(QFrame):
             end = datetime(ed.year(), ed.month(), ed.day(), 0 if all_day else et.hour(), 0 if all_day else et.minute())
             if end < start:
                 end = None
+        targets = self.targets()
+        alarm = self.alarm_min.value() if self.alarm.isChecked() else None
         item = self.item.model_copy(update={
             "title": self.title.text().strip() or self.item.title,
             "start": start, "end": end, "all_day": all_day,
-            "kind": self.target.currentData(),
+            "kind": "task" if targets == {"task"} else ("event" if targets == {"calendar"} else self.item.kind),
+            "category": self.tasklist.currentText() if self.tasklist.currentData() else self.item.category,
             "location": self.location.text().strip() or None,
-            "alarm_minutes": self.alarm_min.value() if self.alarm.isChecked() else None,
+            "alarm_minutes": alarm,
         })
-        return Decision(item=item, target=self.target.currentData(),
-                        alarm_minutes=self.alarm_min.value() if self.alarm.isChecked() else None)
+        return Decision(item=item, targets=targets, alarm_minutes=alarm,
+                        tasklist_id=self.tasklist.currentData() or "",
+                        tasklist_name=self.tasklist.currentText() if self.tasklist.currentData() else "")
 
 
 class ReviewDialog(QDialog):
@@ -164,15 +220,19 @@ class ReviewDialog(QDialog):
 
     def __init__(self, items: list[ScheduleItem], settings: cfg.ScheduleSettings, *,
                  source_label: str = "", warnings: list[str] | None = None,
-                 preview_text: str = "", parent: QWidget | None = None):
+                 preview_text: str = "", tasklists: list[tuple[str, str]] | None = None,
+                 parent: QWidget | None = None):
         super().__init__(parent)
         self.setWindowTitle(f"일정 검토 — {source_label}" if source_label else "일정 검토")
-        self.setMinimumWidth(760)
-        self.resize(820, min(160 + 130 * max(len(items), 1), 720))
+        self.setMinimumWidth(820)
+        self.resize(880, min(160 + 130 * max(len(items), 1), 720))
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        tasklists = tasklists or []
 
-        head = QLabel(f"<b>{len(items)}개</b>의 일정을 찾았습니다. 확인 후 등록하세요." if items
+        head = QLabel(f"<b>{len(items)}개</b>의 일정을 찾았습니다. 📅 캘린더 / ✅ 태스크를 고르고 등록하세요. "
+                      "둘 다 고르면 캘린더엔 마감일로, 태스크엔 할 일로 들어갑니다." if items
                       else "일정을 찾지 못했습니다.")
+        head.setWordWrap(True)
         lay = QVBoxLayout(self)
         lay.addWidget(head)
         for w in warnings or []:
@@ -180,10 +240,10 @@ class ReviewDialog(QDialog):
             wl.setStyleSheet("color: #b8860b;")
             lay.addWidget(wl)
 
-        # 일괄 버튼
         bulk = QHBoxLayout()
-        for label, fn in (("모두 📅 캘린더", lambda: self._bulk_target("calendar")),
-                          ("모두 ✅ 태스크", lambda: self._bulk_target("task")),
+        for label, fn in (("모두 📅", lambda: self._bulk_targets({"calendar"})),
+                          ("모두 ✅", lambda: self._bulk_targets({"task"})),
+                          ("모두 📅+✅", lambda: self._bulk_targets({"calendar", "task"})),
                           ("모두 선택", lambda: self._bulk_check(True)),
                           ("모두 해제", lambda: self._bulk_check(False))):
             b = QPushButton(label)
@@ -192,13 +252,12 @@ class ReviewDialog(QDialog):
         bulk.addStretch(1)
         lay.addLayout(bulk)
 
-        # 행 목록
         self.rows: list[_Row] = []
         body = QWidget()
         body_lay = QVBoxLayout(body)
         body_lay.setContentsMargins(0, 0, 0, 0)
         for it in items:
-            row = _Row(it, settings)
+            row = _Row(it, settings, tasklists)
             self.rows.append(row)
             body_lay.addWidget(row)
         body_lay.addStretch(1)
@@ -207,7 +266,6 @@ class ReviewDialog(QDialog):
         scroll.setWidget(body)
         lay.addWidget(scroll, 1)
 
-        # 원본 미리보기
         if preview_text:
             self.preview_btn = QPushButton("원본 보기 ▾")
             self.preview_btn.setCheckable(True)
@@ -219,7 +277,6 @@ class ReviewDialog(QDialog):
             lay.addWidget(self.preview_btn)
             lay.addWidget(self.preview)
 
-        # 하단
         foot = QHBoxLayout()
         foot.addStretch(1)
         cancel = QPushButton("취소")
@@ -232,9 +289,13 @@ class ReviewDialog(QDialog):
         foot.addWidget(self.ok)
         lay.addLayout(foot)
 
+    # 하위 호환 (테스트/외부에서 단일 대상 일괄 지정)
     def _bulk_target(self, key: str):
+        self._bulk_targets({key})
+
+    def _bulk_targets(self, targets: set[str]):
         for r in self.rows:
-            r.set_target(key)
+            r.set_targets(targets)
 
     def _bulk_check(self, on: bool):
         for r in self.rows:
