@@ -7,12 +7,12 @@ import re
 from pathlib import Path
 from typing import Callable, Protocol
 
-from PySide6.QtCore import QThread, QUrl, Signal
+from PySide6.QtCore import Qt, QThread, QTime, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QTabWidget,
-    QVBoxLayout, QWidget,
+    QTimeEdit, QVBoxLayout, QWidget,
 )
 
 from src import autostart
@@ -76,7 +76,7 @@ def default_coolm_dir() -> str:
 class SettingsDialog(QDialog):
     saved = Signal(object)   # cfg.Config
 
-    TAB_INDEX = {"llm": 0, "general": 1, "rules": 2, "google": 3, "coolm": 4, "update": 5}
+    TAB_INDEX = {"llm": 0, "general": 1, "rules": 2, "teacher": 3, "google": 4, "coolm": 5, "update": 6}
 
     def __init__(self, config: cfg.Config, google_auth: GoogleAuthLike | None = None, parent: QWidget | None = None,
                  *, initial_tab: str | None = None, update_info=None, quit_callback: Callable[[], None] | None = None,
@@ -97,6 +97,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._build_llm(), "LLM")
         tabs.addTab(self._build_general(), "일반")
         tabs.addTab(self._build_rules(), "분류 규칙")
+        tabs.addTab(self._build_teacher(), "교사")
         tabs.addTab(self._build_google(), "Google")
         tabs.addTab(self._build_coolm(), "쿨메신저")
         tabs.addTab(self._build_update(), "업데이트")
@@ -353,6 +354,104 @@ class SettingsDialog(QDialog):
             self._show_tasklist_names()
 
         self._run(self.google.list_tasklists, done, lambda m: self.tasklist_names.setText(f"❌ {m}"))
+
+    # ------------------------------------------------------------ 교사 탭 (시간표)
+    @staticmethod
+    def _qtime(s: str) -> QTime:
+        try:
+            h, m = s.split(":")
+            return QTime(int(h), int(m))
+        except (ValueError, AttributeError):
+            return QTime(9, 0)
+
+    def _build_teacher(self) -> QWidget:
+        t = self.config.teacher
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        self.tt_enabled = QCheckBox("시간표를 AI 해석에 참고 (메시지의 '3교시', '점심시간', '퇴근 전' 등을 시각으로 변환)")
+        self.tt_enabled.setChecked(t.enabled)
+        lay.addWidget(self.tt_enabled)
+
+        form = QFormLayout()
+        row = QHBoxLayout()
+        self.tt_work_start = QTimeEdit(self._qtime(t.work_start)); self.tt_work_start.setDisplayFormat("HH:mm")
+        self.tt_work_end = QTimeEdit(self._qtime(t.work_end)); self.tt_work_end.setDisplayFormat("HH:mm")
+        row.addWidget(QLabel("출근")); row.addWidget(self.tt_work_start)
+        row.addSpacing(12); row.addWidget(QLabel("퇴근(퇴청)")); row.addWidget(self.tt_work_end); row.addStretch(1)
+        form.addRow("근무", row)
+
+        row2 = QHBoxLayout()
+        self.tt_level = QComboBox()
+        for key, label in cfg.SCHOOL_LABELS.items():
+            self.tt_level.addItem(label, key)
+        self.tt_level.setCurrentIndex(max(0, list(cfg.SCHOOL_LABELS).index(t.school_level) if t.school_level in cfg.SCHOOL_LABELS else 1))
+        self.tt_period = QSpinBox(); self.tt_period.setRange(20, 120); self.tt_period.setSuffix("분"); self.tt_period.setValue(t.period_minutes)
+        self.tt_break = QSpinBox(); self.tt_break.setRange(0, 60); self.tt_break.setSuffix("분"); self.tt_break.setValue(t.break_minutes)
+        self.tt_level.currentIndexChanged.connect(
+            lambda _: self.tt_period.setValue(cfg.SCHOOL_PERIOD_MINUTES.get(self.tt_level.currentData(), 45)))
+        row2.addWidget(self.tt_level); row2.addSpacing(8)
+        row2.addWidget(QLabel("수업")); row2.addWidget(self.tt_period)
+        row2.addWidget(QLabel("쉬는 시간")); row2.addWidget(self.tt_break); row2.addStretch(1)
+        form.addRow("학교급", row2)
+
+        self.tt_periods: list[QTimeEdit] = []
+        grid = QHBoxLayout()
+        for i in range(7):
+            s = t.periods[i] if i < len(t.periods) else "09:00"
+            te = QTimeEdit(self._qtime(s)); te.setDisplayFormat("HH:mm")
+            self.tt_periods.append(te)
+            col = QVBoxLayout(); col.setSpacing(2)
+            lbl = QLabel(f"{i + 1}교시"); lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            col.addWidget(lbl); col.addWidget(te)
+            grid.addLayout(col)
+        btn = QPushButton("자동 채우기")
+        btn.setToolTip("1교시 시작 시각 + 수업/쉬는 시간으로 7교시까지 채우고, 4교시 뒤 점심(50분)을 넣습니다")
+        btn.clicked.connect(self._tt_autofill)
+        grid.addWidget(btn, 0, Qt.AlignmentFlag.AlignBottom)
+        form.addRow("교시 시작", grid)
+
+        row3 = QHBoxLayout()
+        self.tt_lunch_start = QTimeEdit(self._qtime(t.lunch_start)); self.tt_lunch_start.setDisplayFormat("HH:mm")
+        self.tt_lunch_end = QTimeEdit(self._qtime(t.lunch_end)); self.tt_lunch_end.setDisplayFormat("HH:mm")
+        row3.addWidget(self.tt_lunch_start); row3.addWidget(QLabel("~")); row3.addWidget(self.tt_lunch_end); row3.addStretch(1)
+        form.addRow("점심시간", row3)
+        lay.addLayout(form)
+
+        self.tt_preview = QLabel()
+        self.tt_preview.setWordWrap(True)
+        self.tt_preview.setStyleSheet("color: palette(mid); font-size: 11px;")
+        lay.addWidget(self.tt_preview)
+        lay.addStretch(1)
+        for wdg in (self.tt_work_start, self.tt_work_end, self.tt_lunch_start, self.tt_lunch_end, *self.tt_periods):
+            wdg.timeChanged.connect(self._tt_preview_update)
+        self.tt_period.valueChanged.connect(self._tt_preview_update)
+        self._tt_preview_update()
+        return w
+
+    def _tt_collect(self) -> cfg.TeacherSettings:
+        return cfg.TeacherSettings(
+            enabled=self.tt_enabled.isChecked(),
+            school_level=self.tt_level.currentData() or "middle",
+            work_start=self.tt_work_start.time().toString("HH:mm"),
+            work_end=self.tt_work_end.time().toString("HH:mm"),
+            period_minutes=self.tt_period.value(),
+            break_minutes=self.tt_break.value(),
+            periods=[te.time().toString("HH:mm") for te in self.tt_periods],
+            lunch_start=self.tt_lunch_start.time().toString("HH:mm"),
+            lunch_end=self.tt_lunch_end.time().toString("HH:mm"),
+        )
+
+    def _tt_autofill(self):
+        t = self._tt_collect()
+        t.autofill(first=self.tt_periods[0].time().toString("HH:mm"))
+        for te, s in zip(self.tt_periods, t.periods):
+            te.setTime(self._qtime(s))
+        self.tt_lunch_start.setTime(self._qtime(t.lunch_start))
+        self.tt_lunch_end.setTime(self._qtime(t.lunch_end))
+        self._tt_preview_update()
+
+    def _tt_preview_update(self, *_):
+        self.tt_preview.setText("AI에 전달되는 시간표:\n" + self._tt_collect().describe())
 
     # ------------------------------------------------------------ Google 탭
     def _build_google(self) -> QWidget:
@@ -675,6 +774,8 @@ class SettingsDialog(QDialog):
             s.calendar_id = self.calendar.currentData() or "primary"
         if self.tasklist.count():
             s.tasklist_id = self.tasklist.currentData() or ""
+
+        c.teacher = self._tt_collect()
 
         cm = c.coolm
         cm.enabled = self.coolm_enabled.isChecked()

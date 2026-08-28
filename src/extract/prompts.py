@@ -42,6 +42,10 @@ SYSTEM_PROMPT = """당신은 한국 학교 교사의 일정 비서입니다. 입
     - "ambiguous": 대상이 명시되지 않고 사용자 해당 여부를 알 수 없을 때
     수신자 이름이 [이름]처럼 마스킹됐다는 이유만으로 irrelevant 로 판단하지 않습니다. 역할이 없으면 "relevant".
     scope_reason 에 "수신 대상: … / 사용자: …" 형식으로 한 문장. irrelevant 여도 items 는 평소대로 추출합니다(코드가 처리).
+16. "시간표 참고"가 주어지면 교시·점심·출퇴근 표현을 그 시각으로 바꿉니다:
+    "3교시에" → 3교시 시작~끝, "4교시 마치고/끝나고" → 4교시 종료 시각, "점심시간에" → 점심 시작~끝,
+    "퇴근(퇴청) 전까지" → 퇴근 시각 마감(time=퇴근 시각), "출근하면/아침에" → 출근 시각, "방과 후" → 마지막 교시 종료 이후.
+    시간표에 없는 교시(예: 8교시)는 마지막 교시 + 수업·쉬는 시간으로 추정하되 confidence 를 낮춥니다.
 
 출력은 아래 JSON 하나만. 다른 텍스트 금지.
 {
@@ -88,11 +92,15 @@ def calendar_hint(ref: date) -> str:
 
 def user_prompt(text: str, ref: date, source: str = "", has_images: bool = False, *,
                 kind_rules: str = "", category_rules: str = "", categories: list[str] | tuple[str, ...] = (),
-                persona: str = "") -> str:
+                persona: str = "", timetable: str = "") -> str:
     wd = WEEKDAYS_KO[ref.weekday()]
     parts = [f"기준일: {ref.isoformat()} ({wd}요일)", calendar_hint(ref)]
     if source:
         parts.append(f"출처: {source}")
+    if timetable.strip():
+        parts.append("")
+        parts.append("=== 시간표 참고 (교시·점심·출퇴근 표현 해석용) ===")
+        parts.append(timetable.strip())
     if persona.strip():
         parts.append("")
         parts.append("=== 사용자 역할 (scope 판단 기준) ===")

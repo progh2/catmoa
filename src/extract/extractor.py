@@ -45,14 +45,15 @@ class Extractor:
     def extract(self, parsed: ParsedInput, ref: date | None = None, source: str = "", *,
                 kind_rules: str = "", category_rules: str = "",
                 categories: list[str] | tuple[str, ...] = (),
-                drop_before: date | None = None, persona: str = "", skip_irrelevant: bool = True) -> ExtractionResult:
+                drop_before: date | None = None, persona: str = "", skip_irrelevant: bool = True,
+                timetable: str = "") -> ExtractionResult:
         """drop_before: 이 날짜보다 앞선 항목은 버린다 (예: 쪽지 수신일 이전의 지나간 일정).
         persona: 사용자 역할. 주어지면 scope(관련성)를 판정하고, skip_irrelevant 면 무관한 내용은 항목을 비운다."""
         ref = ref or date.today()
         source = source or parsed.source
         warnings: list[str] = []
         prompt_opts = dict(kind_rules=kind_rules, category_rules=category_rules, categories=tuple(categories),
-                           persona=persona)
+                           persona=persona, timetable=timetable)
 
         text = parsed.text or ""
         if len(text) > MAX_TEXT_CHARS:

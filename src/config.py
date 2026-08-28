@@ -60,6 +60,60 @@ class ScheduleSettings:
     complete_inbox_after_import: bool = True
 
 
+SCHOOL_PERIOD_MINUTES = {"elementary": 40, "middle": 45, "high": 50}
+SCHOOL_LABELS = {"elementary": "초등학교 (40분)", "middle": "중학교 (45분)", "high": "고등학교 (50분)"}
+
+
+@dataclass
+class TeacherSettings:
+    """교사 근무 시간표 — 메시지의 '퇴근 전', '3교시', '점심시간' 같은 표현을 시각으로 해석하는 기준."""
+    enabled: bool = True
+    school_level: str = "middle"            # elementary | middle | high
+    work_start: str = "08:30"
+    work_end: str = "16:30"
+    period_minutes: int = 45
+    break_minutes: int = 10
+    periods: list = field(default_factory=lambda: ["09:00", "09:55", "10:50", "11:45", "13:30", "14:25", "15:20"])
+    lunch_start: str = "12:30"
+    lunch_end: str = "13:20"
+
+    def autofill(self, first: str | None = None, lunch_after: int = 4) -> None:
+        """1교시 시작 + 수업/쉬는 시간으로 7교시까지 채운다. lunch_after 교시가 끝난 뒤 점심(50분)."""
+        from datetime import datetime, timedelta
+
+        t = datetime.strptime(first or (self.periods[0] if self.periods else "09:00"), "%H:%M")
+        out: list[str] = []
+        for i in range(1, 8):
+            out.append(t.strftime("%H:%M"))
+            t += timedelta(minutes=self.period_minutes)
+            if i == lunch_after:
+                self.lunch_start = t.strftime("%H:%M")
+                t += timedelta(minutes=50)
+                self.lunch_end = t.strftime("%H:%M")
+            else:
+                t += timedelta(minutes=self.break_minutes)
+        self.periods = out
+
+    def describe(self) -> str:
+        """프롬프트용 시간표 문자열."""
+        from datetime import datetime, timedelta
+
+        if not self.enabled:
+            return ""
+        lines = [f"출근 {self.work_start}, 퇴근(퇴청) {self.work_end}, 수업 {self.period_minutes}분"]
+        parts = []
+        for i, s in enumerate(self.periods[:7], 1):
+            try:
+                e = (datetime.strptime(s, "%H:%M") + timedelta(minutes=self.period_minutes)).strftime("%H:%M")
+            except ValueError:
+                continue
+            parts.append(f"{i}교시 {s}~{e}")
+        if parts:
+            lines.append(", ".join(parts))
+        lines.append(f"점심시간 {self.lunch_start}~{self.lunch_end}")
+        return "\n".join(lines)
+
+
 @dataclass
 class CoolmSettings:
     enabled: bool = False
@@ -87,6 +141,7 @@ class Config:
     llm: LLMSettings = field(default_factory=LLMSettings)
     schedule: ScheduleSettings = field(default_factory=ScheduleSettings)
     coolm: CoolmSettings = field(default_factory=CoolmSettings)
+    teacher: TeacherSettings = field(default_factory=TeacherSettings)
     ui: UISettings = field(default_factory=UISettings)
     update: UpdateSettings = field(default_factory=UpdateSettings)
     version: int = 1
