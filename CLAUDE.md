@@ -12,7 +12,8 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.3.3 — 사용자 Windows 는 **ARM64(Parallels)**: 업데이터가 arm64 산출물만 찾아 실패 → updater.asset_candidates() 로 x86_64 exe 폴백(x64 에뮬레이션). CI 는 x86_64 만 빌드. ≤1.3.2 Windows 클라이언트는 수동 설치 1회 필요
+- intent: 이미지 고양이 인프라 완료(#29, 미릴리스). 사용자가 PNG 제작 중 → 받으면 assets/cat/ 에 넣고 v1.4.0 릴리스. 규격: assets/cat/README.md (idle 필수, {state}_N.png 프레임, 같은 캔버스). v1.3.4 릴리스됨(⚙ 제거)
+- (이전) v1.3.3 — 사용자 Windows 는 **ARM64(Parallels)**: 업데이터가 arm64 산출물만 찾아 실패 → updater.asset_candidates() 로 x86_64 exe 폴백(x64 에뮬레이션). CI 는 x86_64 만 빌드. ≤1.3.2 Windows 클라이언트는 수동 설치 1회 필요
 - (이전) v1.3.2 — 호버 시 위젯 크기 변동 수정(배지/⚙ 줄 자리 유지 + QFont 직접 지정으로 측정, 창 188×65 고정). v1.3.1 릴리스 성공(dmg/exe/tar.gz). Windows 1.3.1→1.3.2 자동 업데이트 실검증 대기
 - (이전) v1.3.1 태그 발행 — 배포 형식 변경(Windows 단일 exe + macOS dmg) + **Windows 업데이트 스크립트 수정**: DETACHED_PROCESS 가 자식 콘솔 명령마다 검은 창("find 1234")을 띄웠고 `timeout` 이 stdin 없이 실패 → CREATE_NO_WINDOW + ping 대기 + taskkill/이동 재시도, AppController.quit 은 스레드 정리 후 3초 os._exit 폴백. ≤1.3.0 Windows 사용자는 스크립트 버그로 자동 업데이트 불가 → exe 수동 설치 1회 필요
 - v1.3.1 메모: catmoa.spec win32 분기 onefile, build.py make_dmg(hdiutil, Applications 심링크), updater.asset_name_for_platform → dmg/exe/tar.gz, install_root Windows=exe 파일, extract .exe=그대로/.dmg=hdiutil attach→ditto, swap 스크립트 단일 파일 분기. Windows onefile 빌드·교체는 CI/실기기 미검증. ≤1.3.0 클라이언트는 zip 자산이 없어 릴리스 페이지 안내로 폴백(PRD D14). 테스트 125개
