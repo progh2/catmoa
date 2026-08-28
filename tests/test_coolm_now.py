@@ -104,3 +104,103 @@ def test_settings_buttons_exist(app, tmp_path, monkeypatch):
     dlg2 = SettingsDialog(c)                      # 워처 없으면 '지금 확인' 비활성
     assert not dlg2.btn_coolm_now.isEnabled()
     w.deleteLater()
+
+
+# ---------------------------------------------------------------- 우클릭 '지금 확인' (#52)
+
+class _FakeCat:
+    def __init__(self):
+        self.flashes = []
+
+    def flash(self, state, msg=""):
+        self.flashes.append((state, msg))
+
+    def show_error(self, msg):
+        self.flashes.append(("error", msg))
+
+
+class _FakeToast:
+    def __init__(self):
+        self.messages = []
+
+    def show_message(self, msg, near=None, ms=3000):
+        self.messages.append(msg)
+
+
+class _Ctrl:
+    """AppController.coolm_check_now 만 떼어 검증 (위젯/스레드 없이)."""
+    coolm_check_now = None       # 아래에서 실제 함수를 붙인다
+
+    def __init__(self, watcher):
+        self.coolm = watcher
+        self.cat = _FakeCat()
+        self.toast = _FakeToast()
+        self.settings_opened = []
+
+    def open_settings(self, tab=None):
+        self.settings_opened.append(tab)
+
+    def _coolm_fail(self, msg):
+        self.cat.show_error(msg)
+        self.toast.messages.append(f"실패: {msg}")
+
+    def _run_bg(self, fn, on_done, on_error):
+        try:
+            on_done(fn())
+        except Exception as e:      # noqa: BLE001
+            on_error(str(e))
+
+
+def _ctrl(watcher):
+    from src.ui.main_window import AppController
+    c = _Ctrl(watcher)
+    c.coolm_check_now = AppController.coolm_check_now.__get__(c)
+    return c
+
+
+def test_check_now_reads_new_messages(app, tmp_path, monkeypatch):
+    """새 쪽지를 실제로 읽어 큐로 넘긴다 — 없으면 울상 대신 '없어요' 안내."""
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path / "cfg"))
+    path = create_fake_udb(tmp_path / "Memo", _msgs())
+    c = cfg.Config()
+    c.coolm.memo_dir = str(tmp_path / "Memo")
+    w = CoolmWatcher(c)
+    delivered = []
+    w.new_items.connect(delivered.append)
+    ctrl = _ctrl(w)
+
+    ctrl.coolm_check_now()
+    assert ctrl.cat.flashes[0][0] == "searching"
+    assert len(delivered) == 1 and [i.source_label.split(":")[1].strip()[0] for i in delivered[0]] == ["B", "C"]
+
+    ctrl.coolm_check_now()                                   # 더 없으면
+    assert ctrl.cat.flashes[-1][0] == "empty" and "새 쪽지가 없어요" in ctrl.toast.messages[-1]
+
+    append_fake_message(path, {"sender": "D", "body": "새 쪽지", "received": datetime(2026, 6, 9, 8)})
+    ctrl.coolm_check_now()
+    assert len(delivered) == 2 and delivered[1][0].source_label.startswith("쿨메신저: D")
+    w.deleteLater()
+
+
+def test_check_now_missing_folder_guides_to_settings(app, tmp_path, monkeypatch):
+    """폴더가 없으면 울상(오류) 대신 안내 + 설정 열기 — 우클릭이 그냥 실패하던 문제(#52)."""
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path / "cfg"))
+    import src.ui.main_window as mw
+    monkeypatch.setattr(mw.QTimer, "singleShot", lambda ms, fn: fn())
+    c = cfg.Config()
+    c.coolm.memo_dir = str(tmp_path / "없는폴더")
+    ctrl = _ctrl(CoolmWatcher(c))
+    ctrl.coolm_check_now()
+    assert ctrl.cat.flashes == [("annoyed", "쿨메신저 폴더를 찾지 못했어요")]
+    assert "설정 → 쿨메신저" in ctrl.toast.messages[0] and ctrl.settings_opened == ["coolm"]
+
+
+def test_check_now_reports_db_error(app, tmp_path, monkeypatch):
+    """폴더는 있는데 .udb 가 없으면 사유를 그대로 알려준다."""
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path / "cfg"))
+    (tmp_path / "Memo2").mkdir()
+    c = cfg.Config()
+    c.coolm.memo_dir = str(tmp_path / "Memo2")
+    ctrl = _ctrl(CoolmWatcher(c))
+    ctrl.coolm_check_now()
+    assert any("찾을 수 없습니다" in m for m in ctrl.toast.messages)

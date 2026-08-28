@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections import deque
 
 from PySide6.QtCore import Qt, QTimer
@@ -207,9 +208,16 @@ class AppController:
         log.info("등록 결과: %s", rep.summary().replace("\n", " | "))
 
     def _run_bg(self, fn, on_done, on_error) -> None:
+        """fn 을 스레드에서 돌리고 결과/오류는 **메인 스레드**에서 처리한다.
+
+        AppController 는 QObject 가 아니라 콜백이 그냥 파이썬 함수다 → Qt 는 DirectConnection 으로
+        붙어 워커 스레드에서 GUI 를 건드리게 된다(위젯 갱신·토스트가 조용히 실패하거나 죽는다).
+        QTimer.singleShot(0, ...) 으로 메인 스레드 이벤트 루프에 넘긴다.
+        """
         t = _Task(fn)
-        t.done.connect(on_done)
-        t.error.connect(on_error)
+        # context 인자(self.cat) 가 있는 overload 여야 그 위젯의 스레드(=메인)에 예약된다
+        t.done.connect(lambda r: QTimer.singleShot(0, self.cat, lambda: on_done(r)))
+        t.error.connect(lambda m: QTimer.singleShot(0, self.cat, lambda: on_error(m)))
         t.finished.connect(lambda: self._tasks.remove(t) if t in self._tasks else None)
         self._tasks.append(t)
         t.start()
@@ -226,6 +234,14 @@ class AppController:
             self.cat.show()
             self.cat.raise_()
         log.info("고양이 %s", "숨김" if hidden else "표시")
+
+    def bring_to_front(self) -> None:
+        """두 번째 실행이 들어왔을 때 — 숨어 있으면 꺼내고 앞으로 올린다."""
+        self.set_cat_hidden(False)
+        self.cat.raise_()
+        self.cat.activateWindow()
+        self.cat.flash("happy", "여기 있어요! 이미 실행 중이에요.")
+        self.toast.show_message("catmoa 는 이미 실행 중이에요 🐈", near=self.cat)
 
     def open_settings(self, tab: str | None = None) -> None:
         dlg = SettingsDialog(self.config, google_auth=self.google, parent=None,
@@ -268,13 +284,26 @@ class AppController:
         log.warning("쿨메신저 오류: %s", msg)
 
     def coolm_check_now(self) -> None:
-        """우클릭 메뉴 → 쿨메신저 새 쪽지 강제 확인."""
+        """우클릭 메뉴 → 쿨메신저 새 쪽지 강제 확인.
+
+        폴더를 못 찾는 게 대부분의 실패 원인이라 먼저 메인 스레드에서 확인하고,
+        그때는 울상 대신 설정으로 안내한다.
+        """
+        memo_dir = self.coolm.memo_dir()
+        if not memo_dir or not os.path.isdir(memo_dir):
+            self.cat.flash("annoyed", "쿨메신저 폴더를 찾지 못했어요")
+            self.toast.show_message(
+                "쿨메신저 메시지 폴더를 찾지 못했어요. 설정 → 쿨메신저에서 Memo 폴더를 지정해 주세요."
+                + (f"\n(찾아본 곳: {memo_dir})" if memo_dir else ""), near=self.cat, ms=7000)
+            QTimer.singleShot(300, lambda: self.open_settings(tab="coolm"))
+            return
         self.cat.flash("searching", "쿨메신저 새 쪽지 확인 중…")
 
         def done(msgs):
             n = self.coolm.deliver(msgs)
             if not n:
                 self.cat.flash("empty", "쿨메신저: 새 쪽지가 없습니다.")
+                self.toast.show_message("쿨메신저: 새 쪽지가 없어요.", near=self.cat)
 
         self._run_bg(self.coolm.fetch_now, done, self._coolm_fail)
 
@@ -330,7 +359,6 @@ class AppController:
                 d.close()
         QApplication.instance().quit()
         # Qt 루프가 어떤 이유로든 안 끝나면(스레드 잔존 등) 3초 뒤 프로세스를 확실히 끝낸다
-        import os
         import threading
 
         threading.Timer(3.0, lambda: os._exit(0)).start()

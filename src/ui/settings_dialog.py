@@ -45,7 +45,12 @@ class _Task(QThread):
         try:
             self.done.emit(self._fn())
         except Exception as e:  # noqa: BLE001
-            self.error.emit(str(e))
+            import logging
+            import traceback
+
+            logging.getLogger(__name__).warning("백그라운드 작업 실패:\n%s", traceback.format_exc())
+            # str(e) 가 비어 있는 예외(OSError 일부 등)도 사용자에게 뭔가는 보이도록
+            self.error.emit(str(e) or f"{type(e).__name__}")
 
 
 class _DownloadTask(QThread):

@@ -31,11 +31,24 @@ def main() -> int:
     app.setOrganizationName("catmoa")
     app.setQuitOnLastWindowClosed(False)
 
+    from src import single_instance as si
+
+    if si.take_over() == "exit":
+        # 이미 같은/최신 버전이 떠 있다 — 그 고양이를 보여주고 조용히 빠진다
+        print("[catmoa] 이미 실행 중입니다. 떠 있는 고양이를 보여줍니다.")
+        return 0
+
     from src.ui.main_window import create_main_widget
 
     widget = create_main_widget()
+    ctrl = widget._controller
+    server = si.InstanceServer(on_show=ctrl.bring_to_front, on_quit=ctrl.quit)
+    app.aboutToQuit.connect(si.clear_lock)
     widget.show()
-    return app.exec()
+    try:
+        return app.exec()
+    finally:
+        server.close()
 
 
 if __name__ == "__main__":
