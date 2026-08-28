@@ -1,4 +1,5 @@
 import json
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -14,6 +15,7 @@ def _isolated(tmp_path, monkeypatch):
     monkeypatch.delenv("CATMOA_GOOGLE_CLIENT_ID", raising=False)
     monkeypatch.delenv("CATMOA_GOOGLE_CLIENT_SECRET", raising=False)
     monkeypatch.setattr(cfg, "_load_dotenv", lambda: {})
+    monkeypatch.setitem(sys.modules, "src._secrets", None)  # 로컬 빌드 산출 src/_secrets.py 격리
 
 
 def test_client_config_requires_id(monkeypatch):

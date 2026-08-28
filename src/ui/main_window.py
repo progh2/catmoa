@@ -39,8 +39,10 @@ class AppController:
         self._update_info = None
         self.cat.quit_requested.connect(self.quit)
 
+        self.tasklists: list[tuple[str, str]] = []   # Google Tasks 목록 (id, 이름) — 카테고리로 사용
         # 부모를 위젯으로 두어 종료 시 C++/Python 소유권 충돌("shared QObject was deleted directly")을 막는다
-        self.worker = PipelineWorker(lambda: create_provider(self.config.llm), parent=self.cat)
+        self.worker = PipelineWorker(lambda: create_provider(self.config.llm), parent=self.cat,
+                                     options_factory=self._extract_options)
         self.worker.phase.connect(self._on_phase)
         self.worker.queue_size.connect(self.cat.set_queue_size)
         self.worker.result.connect(self.on_result)
@@ -62,6 +64,23 @@ class AppController:
         # 시작 후 잠시 뒤 업데이트 확인 (설정에서 끌 수 있음)
         if self.config.update.check_on_start:
             QTimer.singleShot(5000, self.check_update)
+        QTimer.singleShot(1500, self.refresh_tasklists)
+
+    # ------------------------------------------------------------ 분류 옵션 / 태스크 목록
+    def _extract_options(self) -> dict:
+        s = self.config.schedule
+        return {"kind_rules": s.kind_rules, "category_rules": s.category_rules,
+                "categories": [name for _, name in self.tasklists]}
+
+    def refresh_tasklists(self) -> None:
+        if not self.google.is_logged_in():
+            return
+
+        def done(lists):
+            self.tasklists = list(lists)
+            log.info("Google Tasks 목록 %d개: %s", len(lists), [n for _, n in lists])
+
+        self._run_bg(self.google.list_tasklists, done, lambda m: log.info("태스크 목록 조회 실패: %s", m))
 
     # ------------------------------------------------------------ 입력 → 큐
     def on_items(self, items: list) -> None:
@@ -94,7 +113,7 @@ class AppController:
             self._show_next_review()
             return
         dlg = ReviewDialog(ex.items, self.config.schedule, source_label=res.item.short,
-                           warnings=ex.warnings, preview_text=_preview_of(res))
+                           warnings=ex.warnings, preview_text=_preview_of(res), tasklists=self.tasklists)
         dlg.submitted.connect(lambda ds, r=res: self.register(ds, r))
         dlg.finished.connect(self._on_review_closed)
         self._review = dlg
@@ -116,7 +135,8 @@ class AppController:
         origin = None
         if res.item.kind == "inbox_task" and res.item.origin_ref and ":" in res.item.origin_ref:
             origin = tuple(res.item.origin_ref.split(":", 1))
-        registrar = Registrar(self.google, self.config.schedule)
+        registrar = Registrar(self.google, self.config.schedule,
+                              tasklists={name: tid for tid, name in self.tasklists})
         self.cat.set_busy(True, "eating")
         self.cat.face.setToolTip("Google에 등록 중…")
         self._run_bg(lambda: registrar.register(decisions, origin_task=origin),
@@ -145,9 +165,11 @@ class AppController:
     # ------------------------------------------------------------ 기타
     def open_settings(self, tab: str | None = None) -> None:
         dlg = SettingsDialog(self.config, google_auth=self.google, parent=None,
-                             initial_tab=tab, update_info=self._update_info, quit_callback=self.quit)
+                             initial_tab=tab, update_info=self._update_info, quit_callback=self.quit,
+                             tasklists=self.tasklists)
         dlg.saved.connect(self._on_settings_saved)
         dlg.exec()
+        self.refresh_tasklists()   # 로그인/목록 변경 반영
 
     # ------------------------------------------------------------ 업데이트
     def check_update(self) -> None:

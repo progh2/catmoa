@@ -281,6 +281,59 @@ class SettingsDialog(QDialog):
         form.addRow("", self.complete_inbox)
         return w
 
+    # ------------------------------------------------------------ 분류 규칙 탭
+    def _build_rules(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        s = self.config.schedule
+
+        lay.addWidget(QLabel("<b>📅 캘린더 / ✅ 태스크 분류 규칙</b> — AI가 event/task를 나눌 때 기본 규칙보다 우선 적용됩니다."))
+        self.kind_rules = QPlainTextEdit(s.kind_rules)
+        self.kind_rules.setPlaceholderText(
+            "예)\n- 연수·출장·회의는 항상 캘린더\n- '제출', '취합', '결재'가 들어가면 태스크\n- 학생 상담은 캘린더와 태스크 둘 다\n- 방과후 수업은 제외")
+        self.kind_rules.setMaximumHeight(110)
+        lay.addWidget(self.kind_rules)
+
+        lay.addWidget(QLabel("<b>✅ 태스크 카테고리(목록) 규칙</b> — 할 일을 어느 Google Tasks 목록에 넣을지 정합니다."))
+        self.category_rules = QPlainTextEdit(s.category_rules)
+        self.category_rules.setPlaceholderText(
+            "예)\n- 교육청 공문 관련은 '학교' 목록\n- 담임 업무·학부모 연락은 '담임' 목록\n- 개인 연수·자격증은 '개인' 목록\n- 나머지는 기본 목록")
+        self.category_rules.setMaximumHeight(110)
+        lay.addWidget(self.category_rules)
+
+        row = QHBoxLayout()
+        self.tasklist_names = QLabel()
+        self.tasklist_names.setWordWrap(True)
+        self.tasklist_names.setStyleSheet("color: palette(mid); font-size: 11px;")
+        self._show_tasklist_names()
+        b = QPushButton("목록 새로고침")
+        b.clicked.connect(self._reload_tasklists)
+        row.addWidget(self.tasklist_names, 1)
+        row.addWidget(b)
+        lay.addLayout(row)
+        lay.addStretch(1)
+        return w
+
+    def _show_tasklist_names(self):
+        if self._tasklists:
+            names = ", ".join(f"'{n}'" for _, n in self._tasklists)
+            self.tasklist_names.setText(f"현재 Google Tasks 목록: {names}\n규칙에서 이 이름을 그대로 쓰면 AI가 항목별로 목록을 제안하고, 검토창에서 바꿀 수 있습니다.")
+        else:
+            self.tasklist_names.setText("Google 로그인 후 목록 새로고침을 누르면 사용 가능한 Tasks 목록 이름이 여기에 표시됩니다. "
+                                        "새 목록은 휴대폰/웹 Google Tasks에서 만드세요.")
+
+    def _reload_tasklists(self):
+        if self.google is None or not self.google.is_logged_in():
+            self.tasklist_names.setText("Google에 로그인되어 있지 않습니다 (Google 탭).")
+            return
+        self.tasklist_names.setText("목록 조회 중…")
+
+        def done(lists):
+            self._tasklists = list(lists)
+            self._show_tasklist_names()
+
+        self._run(self.google.list_tasklists, done, lambda m: self.tasklist_names.setText(f"❌ {m}"))
+
     # ------------------------------------------------------------ Google 탭
     def _build_google(self) -> QWidget:
         w = QWidget()
@@ -512,6 +565,8 @@ class SettingsDialog(QDialog):
 
         s = c.schedule
         s.default_target = self.default_target.currentData()
+        s.kind_rules = self.kind_rules.toPlainText().strip()
+        s.category_rules = self.category_rules.toPlainText().strip()
         s.alarm_enabled = self.alarm_enabled.isChecked()
         s.alarm_minutes = self.alarm_minutes.value()
         s.task_alarm_as_event = self.task_alarm_as_event.isChecked()

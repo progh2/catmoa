@@ -21,6 +21,7 @@ class RawItem(BaseModel):
     end_date: str | None = None
     end_time: str | None = None
     kind: str | None = "event"
+    category: str | None = None      # 태스크 카테고리(Google Tasks 목록 이름)
     location: str | None = None
     notes: str | None = None
     confidence: float | None = 0.8
@@ -41,6 +42,7 @@ class ScheduleItem(BaseModel):
     end: datetime | None = None
     all_day: bool = False
     kind: Kind = "event"
+    category: str | None = None           # 제안된 태스크 목록 이름
     location: str | None = None
     notes: str | None = None
     alarm_minutes: int | None = None     # None = 알람 없음 (기본값은 설정에서 채움)
@@ -152,6 +154,7 @@ def normalize(raw: RawItem, ref: date, source: str = "") -> ScheduleItem | None:
             end=end,
             all_day=all_day,
             kind=kind,
+            category=(raw.category or None) and str(raw.category).strip()[:100] or None,
             location=(raw.location or None) and str(raw.location).strip()[:200] or None,
             notes=(raw.notes or None) and str(raw.notes).strip()[:2000] or None,
             confidence=max(0.0, min(1.0, float(conf))),

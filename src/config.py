@@ -46,7 +46,9 @@ class LLMSettings:
 
 @dataclass
 class ScheduleSettings:
-    default_target: str = "auto"        # auto | calendar | task
+    default_target: str = "auto"        # auto | calendar | task | both
+    kind_rules: str = ""                # 사용자 분류 규칙 (캘린더 vs 태스크)
+    category_rules: str = ""            # 사용자 태스크 카테고리(목록) 규칙
     alarm_enabled: bool = True
     alarm_minutes: int = 30
     task_alarm_as_event: bool = True    # 태스크 알람 → 캘린더 알림 이벤트 생성

@@ -1,4 +1,5 @@
 import json
+import sys
 
 import pytest
 
@@ -12,6 +13,7 @@ def isolated_config(tmp_path, monkeypatch):
     monkeypatch.delenv("CATMOA_GOOGLE_CLIENT_ID", raising=False)
     monkeypatch.delenv("CATMOA_GOOGLE_CLIENT_SECRET", raising=False)
     monkeypatch.setattr(cfg, "_load_dotenv", lambda: {})   # 개발자의 실제 .env 격리
+    monkeypatch.setitem(sys.modules, "src._secrets", None)  # 로컬 빌드가 만든 src/_secrets.py 격리 (ImportError 유도)
     yield tmp_path
 
 

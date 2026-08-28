@@ -53,9 +53,11 @@ class PipelineWorker(QThread):
     failed = Signal(object)             # PipelineFailure
     idle = Signal()                     # 큐가 비었을 때
 
-    def __init__(self, provider_factory: Callable[[], LLMProvider], parent=None):
+    def __init__(self, provider_factory: Callable[[], LLMProvider], parent=None,
+                 options_factory: Callable[[], dict] | None = None):
         super().__init__(parent)
         self._factory = provider_factory
+        self._options = options_factory      # Extractor.extract 키워드 인자 (분류 규칙, 카테고리 목록)
         self._q: queue.Queue[InputItem | None] = queue.Queue()
         self._pending = 0
 
@@ -89,7 +91,8 @@ class PipelineWorker(QThread):
             parsed = parse_item(item)
             self.phase.emit("eating")
             provider = self._factory()
-            extraction = Extractor(provider).extract(parsed, item.reference_date, item.source_label)
+            opts = self._options() if self._options else {}
+            extraction = Extractor(provider).extract(parsed, item.reference_date, item.source_label, **opts)
             log.info("추출 완료: %s → %d건", item.short, len(extraction.items))
             self.result.emit(PipelineResult(item, extraction))
         except (ParseError, ExtractionError, LLMError) as e:

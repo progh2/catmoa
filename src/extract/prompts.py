@@ -35,6 +35,7 @@ SYSTEM_PROMPT = """당신은 한국 학교 교사의 일정 비서입니다. 입
       "end_date": "YYYY-MM-DD 또는 null",
       "end_time": "HH:MM 또는 null",
       "kind": "event 또는 task",
+      "category": "태스크 카테고리 이름 또는 null (카테고리 목록이 주어진 경우에만, 목록에 있는 이름 그대로)",
       "location": "장소 또는 null",
       "notes": "문자열 또는 null",
       "confidence": 0.0
@@ -44,13 +45,30 @@ SYSTEM_PROMPT = """당신은 한국 학교 교사의 일정 비서입니다. 입
 일정이 하나도 없으면 {"items": []} 를 반환합니다."""
 
 
-def user_prompt(text: str, ref: date, source: str = "", has_images: bool = False) -> str:
+def user_prompt(text: str, ref: date, source: str = "", has_images: bool = False, *,
+                kind_rules: str = "", category_rules: str = "", categories: list[str] | tuple[str, ...] = ()) -> str:
     wd = WEEKDAYS_KO[ref.weekday()]
     parts = [f"기준일: {ref.isoformat()} ({wd}요일)"]
     if source:
         parts.append(f"출처: {source}")
     if has_images:
         parts.append("첨부 이미지의 내용도 함께 분석하세요.")
+    if kind_rules.strip():
+        parts.append("")
+        parts.append("=== 사용자 분류 규칙 (event/task 판단 시 기본 규칙보다 우선) ===")
+        parts.append(kind_rules.strip())
+    if categories:
+        parts.append("")
+        parts.append("=== 태스크 카테고리 ===")
+        parts.append("task 항목의 category 는 다음 목록 중 하나의 이름을 그대로 씁니다 (없으면 null): "
+                     + ", ".join(f'"{c}"' for c in categories))
+        if category_rules.strip():
+            parts.append("카테고리 선택 규칙:")
+            parts.append(category_rules.strip())
+    elif category_rules.strip():
+        parts.append("")
+        parts.append("=== 태스크 카테고리 규칙 (category 필드에 반영) ===")
+        parts.append(category_rules.strip())
     parts.append("")
     if text.strip():
         parts.append("=== 입력 시작 ===")

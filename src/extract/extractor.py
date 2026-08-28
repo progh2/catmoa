@@ -33,10 +33,13 @@ class Extractor:
     def __init__(self, provider: LLMProvider):
         self.provider = provider
 
-    def extract(self, parsed: ParsedInput, ref: date | None = None, source: str = "") -> ExtractionResult:
+    def extract(self, parsed: ParsedInput, ref: date | None = None, source: str = "", *,
+                kind_rules: str = "", category_rules: str = "",
+                categories: list[str] | tuple[str, ...] = ()) -> ExtractionResult:
         ref = ref or date.today()
         source = source or parsed.source
         warnings: list[str] = []
+        prompt_opts = dict(kind_rules=kind_rules, category_rules=category_rules, categories=tuple(categories))
 
         text = parsed.text or ""
         if len(text) > MAX_TEXT_CHARS:
@@ -50,7 +53,7 @@ class Extractor:
 
         req = LLMRequest(
             system=SYSTEM_PROMPT,
-            text=user_prompt(text, ref, source, has_images=bool(images)),
+            text=user_prompt(text, ref, source, has_images=bool(images), **prompt_opts),
             images=images,
             json_mode=True,
             max_tokens=4096,
