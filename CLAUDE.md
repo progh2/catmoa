@@ -12,7 +12,8 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.4.2 — classifi_harness 반영(#32): 쿨메신저 '님이 보낸글 >>' 구분자, 역할(persona) 기반 scope 판정(irrelevant→항목 비움+토스트), 날짜 없는 task(undated, 태스크 due 생략), 행동형 제목 규칙. 토스트 알림(ui/toast.py: 컨테이너+windowOpacity — 최상위 QLabel+GraphicsEffect는 배경 안 그려짐). 업데이트 확인 403(API 한도) → github.com 리다이렉트 폴백. 앱 아이콘·랜딩을 새 고양이 이미지로. Edge SmartScreen 안내
+- intent: v1.4.3 릴리스 진행 + 미태그 커밋(쿨메신저 Windows 전용 잠금). v1.4.3: 쿨메신저 '지금 확인' 실패 사유 토스트, Memo 폴더 자동 탐지 후보 확장(APPDATA/PROGRAMDATA/계정별 하위). 다음 태그 v1.4.4 에 macOS 잠금 포함
+- (이전) v1.4.2 — classifi_harness 반영(#32): 쿨메신저 '님이 보낸글 >>' 구분자, 역할(persona) 기반 scope 판정(irrelevant→항목 비움+토스트), 날짜 없는 task(undated, 태스크 due 생략), 행동형 제목 규칙. 토스트 알림(ui/toast.py: 컨테이너+windowOpacity — 최상위 QLabel+GraphicsEffect는 배경 안 그려짐). 업데이트 확인 403(API 한도) → github.com 리다이렉트 폴백. 앱 아이콘·랜딩을 새 고양이 이미지로. Edge SmartScreen 안내
 - (이전) v1.4.1 — 등록 전 중복 검사(#31: gsync/dedupe.py + ui/dedupe_dialog.py, Decision.dedupe[target]=(action, existing, tasklist_id), Registrar skip/update/create) + 검토창 항목 체크박스 제거(📅/✅ 둘 다 끄면 제외). 테스트 152개
 - (이전) v1.4.0 — 이미지 고양이 적용(사용자 원본 11장 → tools/prepare_cat.py 로 assets/cat/ 18파일 320px 생성, 원본은 assets/cat-src/ git 제외). 새 상태: searching(쿨메신저 폴링, 서류 찾는 고양이) / bored(5분 유휴) / empty(일정 없음) / annoyed(미지원 입력); sleeping 은 30분. 쿨메신저 인용 대화 분리(#30) + 달력 힌트 + 지난 항목 제외. 이미지 모드 QSS 는 상태 규칙 뒤에 둬야 투명 유지
 - (이전) v1.3.3 — 사용자 Windows 는 **ARM64(Parallels)**: 업데이터가 arm64 산출물만 찾아 실패 → updater.asset_candidates() 로 x86_64 exe 폴백(x64 에뮬레이션). CI 는 x86_64 만 빌드. ≤1.3.2 Windows 클라이언트는 수동 설치 1회 필요
