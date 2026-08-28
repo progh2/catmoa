@@ -53,17 +53,18 @@ def test_review_defaults_bulk_and_category(app):
     assert all(x.targets == {"calendar", "task"} for x in d.decisions())
     d._bulk_targets({"task"})
     assert all(x.targets == {"task"} for x in d.decisions())
-    d._bulk_check(False)
-    assert d.decisions() == []
-    d._bulk_check(True)
-    assert len(d.decisions()) == 2
+    d._bulk_check(False)                            # 모두 끄기 → 등록 안 함
+    assert d.decisions() == [] and not any(r.selected for r in d.rows)
+    d._bulk_check(True)                             # 기본 대상 복원
+    assert [x.targets for x in d.decisions()] == [{"calendar"}, {"task"}]
 
 
 def test_review_no_target_excluded_and_kind_follows_targets(app):
     d = ReviewDialog(_items(), cfg.ScheduleSettings(), tasklists=LISTS)
     r0, r1 = d.rows
-    r0.cal.setChecked(False)                       # 아무 대상도 없음 → 제외
-    assert len(d.decisions()) == 1
+    r0.cal.setChecked(False)                       # 아무 대상도 없음 → 제외, 편집란 비활성
+    assert len(d.decisions()) == 1 and not r0.selected and not r0.title.isEnabled()
+    assert not hasattr(r0, "check")                # 별도 '선택' 체크박스 없음
     r1.set_targets({"calendar"})                   # task 항목을 캘린더만 → kind event
     assert d.decisions()[0].item.kind == "event"
     r1.set_targets({"calendar", "task"})           # 둘 다 → 원래 kind 유지
@@ -83,6 +84,7 @@ def test_review_edit_and_submit(app):
     r0.all_day.setChecked(True)
     r0.task.setChecked(True)
     r0.tasklist.setCurrentIndex(r0.tasklist.findData("L3"))
+    r1.set_targets(set())                          # r1 은 등록 안 함
     got = []
     d.submitted.connect(got.append)
     d._submit()

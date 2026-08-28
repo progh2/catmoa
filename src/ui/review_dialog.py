@@ -28,6 +28,8 @@ class Decision:
     alarm_minutes: int | None = None                  # None = 알람 없음
     tasklist_id: str = ""                             # "" = 설정의 기본 목록
     tasklist_name: str = ""
+    # 중복 검사 결과 처리: target → (action, 기존 항목 dict, tasklist_id). action: "skip" | "update" | "create"
+    dedupe: dict = field(default_factory=dict)
 
     @property
     def target(self) -> str:
@@ -60,9 +62,7 @@ class _Row(QFrame):
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet("_Row { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; }")
 
-        # ---- 1행: 선택 · 📅 · ✅ · 태스크 목록 · 제목 · 알람
-        self.check = QCheckBox()
-        self.check.setChecked(True)
+        # ---- 1행: [등록 대상: 📅 · ✅ · 태스크 목록] · 제목 · 알람   (📅/✅ 둘 다 끄면 등록하지 않음)
         targets = default_targets(item, settings)
         self.cal = QCheckBox("📅 캘린더")
         self.cal.setToolTip("캘린더에 등록 (태스크와 함께 선택하면 마감일 일정으로)")
@@ -85,11 +85,20 @@ class _Row(QFrame):
         self.alarm_min.setSuffix("분 전")
         self.alarm_min.setValue(item.alarm_minutes if item.alarm_minutes is not None else settings.alarm_minutes)
 
+        # 대상 선택 묶음 — 제목·알람과 시각적으로 구분
+        self.target_box = QFrame(objectName="targetBox")
+        self.target_box.setStyleSheet(
+            "#targetBox { background: palette(alternate-base); border: 1px solid palette(mid); border-radius: 6px; }")
+        tb = QHBoxLayout(self.target_box)
+        tb.setContentsMargins(8, 2, 8, 2)
+        tb.setSpacing(8)
+        tb.addWidget(self.cal)
+        tb.addWidget(self.task)
+        tb.addWidget(self.tasklist)
+
         r1 = QHBoxLayout()
-        r1.addWidget(self.check)
-        r1.addWidget(self.cal)
-        r1.addWidget(self.task)
-        r1.addWidget(self.tasklist)
+        r1.setSpacing(10)
+        r1.addWidget(self.target_box)
         r1.addWidget(self.title, 1)
         r1.addWidget(self.alarm)
         r1.addWidget(self.alarm_min)
@@ -115,7 +124,7 @@ class _Row(QFrame):
         self.location.setPlaceholderText("장소")
 
         r2 = QHBoxLayout()
-        r2.addSpacing(24)
+        r2.addSpacing(8)
         r2.addWidget(self.date)
         r2.addWidget(self.all_day)
         r2.addWidget(self.time)
@@ -145,9 +154,14 @@ class _Row(QFrame):
         lay.addLayout(r2)
         lay.addWidget(self.notes)
 
-        for w in (self.all_day, self.has_end, self.check, self.cal, self.task, self.alarm):
+        for w in (self.all_day, self.has_end, self.cal, self.task, self.alarm):
             w.toggled.connect(self._sync_enabled)
         self._sync_enabled()
+
+    @property
+    def selected(self) -> bool:
+        """📅 또는 ✅ 가 켜져 있으면 등록 대상."""
+        return bool(self.targets())
 
     def _preselect_tasklist(self, item, settings, tasklists):
         want = None
@@ -160,11 +174,13 @@ class _Row(QFrame):
         self.tasklist.setCurrentIndex(idx if idx >= 0 else 0)
 
     def _sync_enabled(self, *_):
-        on = self.check.isChecked()
-        for w in (self.cal, self.task, self.title, self.alarm, self.date, self.all_day, self.time,
+        on = self.selected
+        for w in (self.title, self.alarm, self.date, self.all_day, self.time,
                   self.has_end, self.end_date, self.end_time, self.location):
             w.setEnabled(on)
-        self.tasklist.setEnabled(on and self.task.isChecked())
+        self.tasklist.setEnabled(self.task.isChecked())
+        self.setStyleSheet("_Row { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; }"
+                           if on else "_Row { background: palette(window); border: 1px dashed palette(mid); border-radius: 8px; }")
         if on:
             self.alarm_min.setEnabled(self.alarm.isChecked())
             all_day = self.all_day.isChecked()
@@ -187,7 +203,7 @@ class _Row(QFrame):
         return t
 
     def decision(self) -> Decision | None:
-        if not self.check.isChecked() or not self.targets():
+        if not self.selected:
             return None
         d = self.date.date()
         all_day = self.all_day.isChecked()
@@ -228,9 +244,10 @@ class ReviewDialog(QDialog):
         self.resize(880, min(160 + 130 * max(len(items), 1), 720))
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         tasklists = tasklists or []
+        self._settings = settings
 
-        head = QLabel(f"<b>{len(items)}개</b>의 일정을 찾았습니다. 📅 캘린더 / ✅ 태스크를 고르고 등록하세요. "
-                      "둘 다 고르면 캘린더엔 마감일로, 태스크엔 할 일로 들어갑니다." if items
+        head = QLabel(f"<b>{len(items)}개</b>의 일정을 찾았습니다. 항목마다 <b>등록 대상</b>(📅 캘린더 / ✅ 태스크)을 고르세요 — "
+                      "둘 다 고르면 캘린더엔 마감일로, 태스크엔 할 일로 들어가고, <b>둘 다 끄면 등록하지 않습니다</b>." if items
                       else "일정을 찾지 못했습니다.")
         head.setWordWrap(True)
         lay = QVBoxLayout(self)
@@ -241,11 +258,10 @@ class ReviewDialog(QDialog):
             lay.addWidget(wl)
 
         bulk = QHBoxLayout()
-        for label, fn in (("모두 📅", lambda: self._bulk_targets({"calendar"})),
-                          ("모두 ✅", lambda: self._bulk_targets({"task"})),
+        for label, fn in (("모두 📅 캘린더", lambda: self._bulk_targets({"calendar"})),
+                          ("모두 ✅ 태스크", lambda: self._bulk_targets({"task"})),
                           ("모두 📅+✅", lambda: self._bulk_targets({"calendar", "task"})),
-                          ("모두 선택", lambda: self._bulk_check(True)),
-                          ("모두 해제", lambda: self._bulk_check(False))):
+                          ("모두 끄기 (등록 안 함)", lambda: self._bulk_check(False))):
             b = QPushButton(label)
             b.clicked.connect(fn)
             bulk.addWidget(b)
@@ -298,8 +314,9 @@ class ReviewDialog(QDialog):
             r.set_targets(targets)
 
     def _bulk_check(self, on: bool):
+        """on=False: 모두 끄기(등록 안 함), on=True: 기본 대상으로 되돌리기."""
         for r in self.rows:
-            r.check.setChecked(on)
+            r.set_targets(default_targets(r.item, self._settings) if on else set())
 
     def decisions(self) -> list[Decision]:
         return [d for r in self.rows if (d := r.decision()) is not None]
