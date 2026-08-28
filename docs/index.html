@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>catmoa 🐱 — 교사를 위한 일정 수집 고양이</title>
+<meta name="description" content="한글 문서, PDF, 스크린샷, 쿨메신저 쪽지를 고양이에게 던져주면 AI가 일정을 뽑아 Google 캘린더/Tasks에 넣어줍니다. macOS · Windows · Linux.">
+<meta property="og:title" content="catmoa — 교사를 위한 일정 수집 고양이">
+<meta property="og:description" content="흩어진 일정 자료를 고양이에게 던지면 AI가 Google 캘린더/Tasks에 넣어줍니다.">
+<meta property="og:image" content="https://progh2.github.io/catmoa/icon.png">
+<meta property="og:type" content="website">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    --cream: #fffaf0;
+    --cream-2: #fff3dc;
+    --peach: #ffd9a8;
+    --orange: #f2a65a;
+    --orange-deep: #e08a3a;
+    --brown: #3a2e1e;
+    --brown-soft: #6b5a45;
+    --pink: #ffb8c6;
+    --mint: #bfe8d6;
+    --sky: #c9def7;
+    --card: #ffffff;
+    --shadow: 0 10px 30px rgba(120, 80, 30, .12);
+    --radius: 24px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+  body {
+    margin: 0;
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+    color: var(--brown);
+    background:
+      radial-gradient(circle at 10% 10%, #ffe9c7 0, transparent 40%),
+      radial-gradient(circle at 90% 30%, #ffe0e8 0, transparent 35%),
+      radial-gradient(circle at 50% 100%, #dff3ea 0, transparent 40%),
+      var(--cream);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  a { color: var(--orange-deep); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+  /* ── 헤더 ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; text-decoration: none; color: var(--brown); }
+  .logo img { width: 36px; height: 36px; border-radius: 10px; }
+  nav a { margin-left: 18px; text-decoration: none; color: var(--brown-soft); font-weight: 600; font-size: 15px; }
+  nav a:hover { color: var(--orange-deep); }
+  @media (max-width: 600px) { nav .hide-sm { display: none; } }
+
+  /* ── 히어로 ── */
+  .hero { text-align: center; padding: 48px 0 40px; position: relative; }
+  .cat-stage { position: relative; height: 200px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 -20px; }
+  .cat {
+    font-size: clamp(40px, 9vw, 72px);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    background: var(--card);
+    padding: 12px 34px;
+    border-radius: 999px;
+    border: 4px solid var(--peach);
+    box-shadow: var(--shadow);
+    animation: bob 3s ease-in-out infinite;
+    white-space: nowrap;
+    font-family: "Pretendard Variable", "Hiragino Sans", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
+    user-select: none;
+  }
+  .cat.eat { animation: chomp .5s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+  @keyframes chomp { 0%,100% { transform: scale(1) } 50% { transform: scale(1.06) rotate(-2deg) } }
+  .food {
+    position: absolute; font-size: 34px; opacity: 0; pointer-events: none;
+    animation: fly 6s ease-in infinite;
+  }
+  @keyframes fly {
+    0%   { opacity: 0; transform: translate(var(--fx), var(--fy)) scale(1) rotate(0deg); }
+    8%   { opacity: 1; }
+    40%  { opacity: 1; transform: translate(0, -10px) scale(.6) rotate(360deg); }
+    46%  { opacity: 0; transform: translate(0, 0) scale(.1); }
+    100% { opacity: 0; transform: translate(0, 0) scale(.1); }
+  }
+  .tooltip {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    background: var(--brown); color: #fff; font-size: 13px; padding: 6px 12px; border-radius: 10px;
+    opacity: 0; transition: opacity .3s; white-space: nowrap;
+  }
+  .tooltip.show { opacity: 1; }
+  @media (max-width: 520px) {
+    .cat { font-size: 34px; padding: 10px 22px; border-width: 3px; }
+    .food { font-size: 26px; }
+    .food:nth-of-type(1) { --fx: -130px !important; --fy: -70px !important; }
+    .food:nth-of-type(2) { --fx: 130px !important; --fy: -60px !important; }
+    .food:nth-of-type(3) { --fx: -110px !important; --fy: 70px !important; }
+  }
+  h1 { font-size: clamp(30px, 6vw, 52px); margin: 18px 0 8px; letter-spacing: -.03em; line-height: 1.2; }
+  h1 .hl { background: linear-gradient(transparent 60%, var(--peach) 60%); padding: 0 4px; }
+  .sub { font-size: clamp(16px, 2.4vw, 20px); color: var(--brown-soft); margin: 0 auto 28px; max-width: 640px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 24px; border-radius: 999px; font-weight: 700; font-size: 16px;
+    text-decoration: none; transition: transform .15s, box-shadow .15s; border: 3px solid transparent;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .btn.primary { background: var(--orange); color: #fff; border-color: var(--orange); }
+  .btn.ghost { background: var(--card); color: var(--brown); border-color: var(--peach); }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .os-note { font-size: 13px; color: var(--brown-soft); margin-top: 12px; }
+
+  /* ── 섹션 공통 ── */
+  section { padding: 56px 0; }
+  h2 { font-size: clamp(24px, 4vw, 34px); margin: 0 0 8px; letter-spacing: -.02em; text-align: center; }
+  .lead { text-align: center; color: var(--brown-soft); margin: 0 0 32px; }
+  .paw { display: inline-block; margin-right: 6px; }
+
+  /* ── 흐름 ── */
+  .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: stretch; }
+  .step {
+    background: var(--card); border-radius: var(--radius); padding: 26px 22px; box-shadow: var(--shadow);
+    position: relative; border: 3px solid transparent; transition: border-color .2s, transform .2s;
+  }
+  .step:hover { border-color: var(--peach); transform: translateY(-4px); }
+  .step .num {
+    position: absolute; top: -14px; left: 20px; background: var(--orange); color: #fff;
+    width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 14px;
+  }
+  .step .icon { font-size: 40px; margin-bottom: 8px; }
+  .step h3 { margin: 4px 0 6px; font-size: 19px; }
+  .step p { margin: 0; color: var(--brown-soft); font-size: 15px; }
+  .step .tags { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { background: var(--cream-2); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; color: var(--brown-soft); }
+  @media (max-width: 760px) { .flow { grid-template-columns: 1fr; } }
+
+  /* ── 기능 ── */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .feat {
+    background: var(--card); border-radius: 20px; padding: 22px; box-shadow: var(--shadow);
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .feat .ic {
+    flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 24px;
+  }
+  .feat h3 { margin: 0 0 4px; font-size: 17px; }
+  .feat p { margin: 0; color: var(--brown-soft); font-size: 14px; }
+  .bg-peach { background: var(--peach); } .bg-pink { background: var(--pink); }
+  .bg-mint { background: var(--mint); } .bg-sky { background: var(--sky); }
+
+  /* ── 다운로드 ── */
+  #download .box {
+    background: var(--card); border-radius: var(--radius); padding: 36px 28px; box-shadow: var(--shadow);
+    border: 4px dashed var(--peach);
+  }
+  .dl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 24px; }
+  @media (max-width: 700px) { .dl-grid { grid-template-columns: 1fr; } }
+  .dl {
+    display: block; text-decoration: none; color: var(--brown);
+    background: var(--cream); border-radius: 18px; padding: 20px; border: 3px solid transparent;
+    transition: border-color .2s, transform .2s; text-align: center;
+  }
+  .dl:hover { border-color: var(--orange); transform: translateY(-3px); }
+  .dl.mine { border-color: var(--orange); background: #fff1dc; }
+  .dl .os { font-size: 34px; }
+  .dl .name { font-weight: 800; font-size: 18px; margin: 6px 0 2px; }
+  .dl .file { font-size: 12px; color: var(--brown-soft); word-break: break-all; }
+  .dl .you { display: none; font-size: 12px; color: var(--orange-deep); font-weight: 700; margin-top: 6px; }
+  .dl.mine .you { display: block; }
+  .version { text-align: center; font-size: 14px; color: var(--brown-soft); margin-top: 18px; }
+  .version b { color: var(--orange-deep); }
+  .pending {
+    display: none; margin-top: 18px; text-align: center; background: var(--cream-2);
+    border-radius: 14px; padding: 14px; font-size: 14px; color: var(--brown-soft);
+  }
+  details { background: var(--cream); border-radius: 14px; padding: 12px 18px; margin-top: 18px; font-size: 14px; }
+  summary { cursor: pointer; font-weight: 700; }
+  details ul { margin: 8px 0 0; padding-left: 18px; color: var(--brown-soft); }
+  code { background: var(--cream-2); padding: 1px 6px; border-radius: 6px; font-size: .92em; }
+  pre { background: var(--brown); color: #ffe9c7; padding: 16px; border-radius: 14px; overflow-x: auto; font-size: 14px; }
+
+  /* ── 설정 순서 ── */
+  .steps-list { counter-reset: s; list-style: none; padding: 0; margin: 0; max-width: 680px; margin-inline: auto; }
+  .steps-list li {
+    counter-increment: s; position: relative; padding: 14px 16px 14px 58px; background: var(--card);
+    border-radius: 16px; margin-bottom: 10px; box-shadow: var(--shadow);
+  }
+  .steps-list li::before {
+    content: counter(s); position: absolute; left: 14px; top: 12px; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--pink); color: var(--brown); font-weight: 800; display: grid; place-items: center;
+  }
+
+  /* ── 개인정보 ── */
+  .privacy { background: var(--card); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); max-width: 760px; margin: 0 auto; }
+  .privacy ul { margin: 0; padding-left: 20px; color: var(--brown-soft); }
+  .privacy li { margin: 6px 0; }
+
+  footer { text-align: center; padding: 40px 0 60px; color: var(--brown-soft); font-size: 14px; }
+  footer .cat-small { font-size: 22px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <a class="logo" href="#"><img src="icon.png" alt="catmoa 아이콘">catmoa</a>
+    <nav>
+      <a href="#how" class="hide-sm">어떻게?</a>
+      <a href="#features" class="hide-sm">기능</a>
+      <a href="#download">다운로드</a>
+      <a href="https://github.com/progh2/catmoa" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <!-- 히어로 -->
+  <section class="hero">
+    <div class="cat-stage" id="stage">
+      <div class="tooltip" id="tip">일정 3건 찾았어요!</div>
+      <span class="food" style="--fx:-260px;--fy:-90px;animation-delay:0s">📄</span>
+      <span class="food" style="--fx:250px;--fy:-70px;animation-delay:2s">🖼️</span>
+      <span class="food" style="--fx:-200px;--fy:80px;animation-delay:4s">💬</span>
+      <div class="cat" id="cat">(=^･ω･^=)</div>
+    </div>
+    <h1>일정 자료를 <span class="hl">고양이에게</span> 던지세요</h1>
+    <p class="sub">한글 문서 · PDF · 스크린샷 · 쿨메신저 쪽지 · 복사한 텍스트.
+      AI가 일정을 뽑아내고, 확인 한 번이면 <b>Google 캘린더 / Tasks</b>에 쏙 들어갑니다.</p>
+    <div class="cta">
+      <a class="btn primary" href="#download" id="heroDl">⬇️ 다운로드</a>
+      <a class="btn ghost" href="#how">어떻게 동작하나요?</a>
+    </div>
+    <p class="os-note">macOS · Windows · Linux 지원 · 무료 · 오픈소스 (MIT)</p>
+  </section>
+
+  <!-- 흐름 -->
+  <section id="how">
+    <h2><span class="paw">🐾</span>세 단계면 끝</h2>
+    <p class="lead">교사 해커톤에서 태어난 프로젝트. 목표는 "사용자 개입 최소화"입니다.</p>
+    <div class="flow">
+      <div class="step">
+        <div class="num">1</div>
+        <div class="icon">🎯</div>
+        <h3>던지기</h3>
+        <p>파일을 고양이 위로 끌어다 놓거나, 스크린샷을 찍고 고양이 위에서 <code>Ctrl+V</code> / <code>⌘V</code>.</p>
+        <div class="tags"><span class="tag">.hwp</span><span class="tag">.hwpx</span><span class="tag">.pdf</span><span class="tag">이미지</span><span class="tag">텍스트</span><span class="tag">쿨메신저</span></div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div class="icon">🍙</div>
+        <h3>냠냠 (AI 분석)</h3>
+        <p>고양이가 먹는 동안 LLM이 날짜·시간·장소·제목을 추출합니다. 여러 개를 연달아 넣어도 차례대로 처리.</p>
+        <div class="tags"><span class="tag">Claude</span><span class="tag">ChatGPT</span><span class="tag">Ollama (로컬)</span></div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div class="icon">📅</div>
+        <h3>확인 → 등록</h3>
+        <p>검토 창에서 항목별로 <b>캘린더 ⇄ 태스크</b> 전환, 알람 설정, 내용 수정 후 등록 버튼 한 번.</p>
+        <div class="tags"><span class="tag">Google Calendar</span><span class="tag">Google Tasks</span><span class="tag">알람 N분 전</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 기능 -->
+  <section id="features">
+    <h2><span class="paw">🐾</span>주요 기능</h2>
+    <p class="lead">작지만 항상 곁에 있는 고양이. 표정으로 상태를 알려줍니다.</p>
+    <div class="grid">
+      <div class="feat"><div class="ic bg-peach">🐱</div><div><h3>고양이 플로팅 위젯</h3><p>항상 위에 떠 있는 작은 텍스트 고양이. 처리 중이면 🍙 먹고, 끝나면 ♪ 노래해요.</p></div></div>
+      <div class="feat"><div class="ic bg-pink">📄</div><div><h3>파일 드롭 & 붙여넣기</h3><p>hwp/hwpx/pdf(스캔본 포함)/이미지 파일, 클립보드의 스크린샷·텍스트까지.</p></div></div>
+      <div class="feat"><div class="ic bg-mint">🔐</div><div><h3>JSON 없는 Google 로그인</h3><p>브라우저 로그인만으로 연결. 토큰은 OS 키체인에 안전하게 저장.</p></div></div>
+      <div class="feat"><div class="ic bg-sky">📥</div><div><h3>Google Tasks 인박스</h3><p>휴대폰에서 대충 적어둔 "인박스" 항목을 불러와 AI가 정리·등록.</p></div></div>
+      <div class="feat"><div class="ic bg-peach">💬</div><div><h3>쿨메신저 연동 (Windows)</h3><p>새 쪽지를 30초마다 확인해 자동 분석. 원본 DB는 읽기 전용 복사본만 사용.</p></div></div>
+      <div class="feat"><div class="ic bg-pink">🧠</div><div><h3>LLM 자유 선택</h3><p>Claude / ChatGPT / 로컬 Ollama. 모델 목록 조회와 연결 테스트 내장.</p></div></div>
+    </div>
+  </section>
+
+  <!-- 다운로드 -->
+  <section id="download">
+    <h2><span class="paw">🐾</span>다운로드</h2>
+    <p class="lead">Python 설치 없이 압축만 풀면 바로 실행됩니다.</p>
+    <div class="box">
+      <div class="dl-grid">
+        <a class="dl" data-os="mac" id="dl-mac" href="https://github.com/progh2/catmoa/releases/latest">
+          <div class="os">🍎</div><div class="name">macOS</div>
+          <div class="file">catmoa-macos-arm64.zip</div><div class="you">✨ 지금 사용 중인 OS</div>
+        </a>
+        <a class="dl" data-os="win" id="dl-win" href="https://github.com/progh2/catmoa/releases/latest">
+          <div class="os">🪟</div><div class="name">Windows 10+</div>
+          <div class="file">catmoa-windows-x86_64.zip</div><div class="you">✨ 지금 사용 중인 OS</div>
+        </a>
+        <a class="dl" data-os="linux" id="dl-linux" href="https://github.com/progh2/catmoa/releases/latest">
+          <div class="os">🐧</div><div class="name">Linux</div>
+          <div class="file">catmoa-linux-x86_64.tar.gz</div><div class="you">✨ 지금 사용 중인 OS</div>
+        </a>
+      </div>
+      <div class="version" id="version">최신 버전 확인 중…</div>
+      <div class="pending" id="pending">
+        🐾 첫 릴리스 준비 중이에요! 곧 이 자리에 다운로드 링크가 생깁니다.<br>
+        그동안은 아래 <b>소스에서 실행</b>으로 미리 써 볼 수 있어요.
+      </div>
+
+      <details>
+        <summary>처음 실행할 때 경고가 떠요</summary>
+        <ul>
+          <li><b>macOS</b>: 압축 해제 후 앱을 <b>우클릭 → 열기</b> (Gatekeeper 확인 창에서 "열기")</li>
+          <li><b>Windows</b>: SmartScreen 창에서 <b>추가 정보 → 실행</b></li>
+          <li><b>Linux</b>: <code>tar xzf catmoa-linux-*.tar.gz && ./catmoa/catmoa</code></li>
+        </ul>
+      </details>
+      <details>
+        <summary>소스에서 실행하기 (개발자용)</summary>
+<pre>git clone https://github.com/progh2/catmoa.git
+cd catmoa
+./run.sh      # macOS / Linux
+run.cmd       # Windows</pre>
+        <ul><li>Python 3.11 이상 필요. 가상환경과 의존성 설치는 스크립트가 알아서 해요.</li></ul>
+      </details>
+    </div>
+  </section>
+
+  <!-- 첫 설정 -->
+  <section id="setup">
+    <h2><span class="paw">🐾</span>첫 설정은 1분이면 충분</h2>
+    <p class="lead">고양이를 우클릭 → <b>설정</b></p>
+    <ol class="steps-list">
+      <li><b>LLM 탭</b> — 공급자 선택 → API 키(또는 Ollama 주소) → 모델 목록 불러오기 → 연결 테스트</li>
+      <li><b>Google 탭</b> — 로그인 → 브라우저에서 계정 선택 → 끝</li>
+      <li><b>일반 탭</b> (선택) — 기본 대상(캘린더/태스크), 기본 알람 시간, 인박스 목록명</li>
+      <li><b>쿨메신저 탭</b> (선택, Windows) — 사용 켜기, 확인 간격(초)</li>
+    </ol>
+  </section>
+
+  <!-- 개인정보 -->
+  <section id="privacy">
+    <h2><span class="paw">🐾</span>개인정보는 이렇게 다뤄요</h2>
+    <p class="lead">별도 서버가 없습니다. 데이터는 <b>내 PC ↔ LLM ↔ Google</b> 사이에서만 오갑니다.</p>
+    <div class="privacy">
+      <ul>
+        <li>입력한 문서·이미지·쪽지 내용은 <b>내가 선택한 LLM 공급자</b>로만 전송돼요. 외부 전송이 걱정되면 로컬 <b>Ollama</b>를 고르세요.</li>
+        <li>쿨메신저 DB는 <b>읽기 전용 복사본</b>으로만 접근하며 원본을 건드리지 않아요.</li>
+        <li>Google 토큰은 OS 키체인(macOS Keychain / Windows Credential Manager / Linux Secret Service)에 저장돼요.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <div class="cat-small">(=^◡ω◡^=)♪</div>
+    <div>catmoa · MIT License · <a href="https://github.com/progh2/catmoa" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/progh2/catmoa/issues" target="_blank" rel="noopener">버그 제보 / 제안</a></div>
+    <div style="margin-top:6px">쿨메신저 .udb 읽기 방식은 <a href="https://github.com/dacisosl/coolm-helper" target="_blank" rel="noopener">coolm-helper</a>(MIT)를 참고했습니다.</div>
+  </footer>
+</div>
+
+<script>
+  // ── 고양이 표정 애니메이션 (앱의 CAT_FACES와 동일) ──
+  const FACES = {
+    idle:   ["(=^･ω･^=)", "(=^･ω･^=)", "(=^･ω･^=)", "(=^-ω-^=)"],
+    eating: ["(=^･ω･^=)🍙", "(=^ω^=)🍙", "(=^･ω･^=)🍚", "(=^ω^=) "],
+    happy:  ["(=^◡ω◡^=)♪", "(=^◡ω◡^=)♫"],
+    hover:  ["(=^･ω･^=)ノ", "(=^･ω･^=)ﾉ"],
+  };
+  const cat = document.getElementById("cat"), tip = document.getElementById("tip");
+  let state = "idle", frame = 0, hovering = false;
+  setInterval(() => { const f = FACES[hovering ? "hover" : state]; cat.textContent = f[frame++ % f.length]; }, 450);
+  // 6초 주기: 음식이 도착(≈2.7s)하면 먹고 → 기뻐하고 → 다시 idle
+  function cycle() {
+    setTimeout(() => { state = "eating"; cat.classList.add("eat"); }, 2600);
+    setTimeout(() => { state = "happy"; cat.classList.remove("eat"); tip.classList.add("show"); }, 4300);
+    setTimeout(() => { state = "idle"; tip.classList.remove("show"); }, 5800);
+  }
+  cycle(); setInterval(cycle, 6000);
+  cat.addEventListener("mouseenter", () => hovering = true);
+  cat.addEventListener("mouseleave", () => hovering = false);
+  cat.addEventListener("click", () => { state = "happy"; setTimeout(() => state = "idle", 1500); });
+
+  // ── OS 감지 ──
+  const ua = navigator.userAgent, plat = navigator.platform || "";
+  const os = /Mac/i.test(plat) ? "mac" : /Win/i.test(plat) ? "win" : /Linux/i.test(plat) && !/Android/i.test(ua) ? "linux" : null;
+  const names = { mac: "macOS", win: "Windows", linux: "Linux" };
+  if (os) {
+    document.getElementById("dl-" + os).classList.add("mine");
+    document.getElementById("heroDl").textContent = "⬇️ " + names[os] + "용 다운로드";
+  }
+
+  // ── 최신 릴리스 정보 (GitHub API) ──
+  const REPO = "progh2/catmoa";
+  fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(rel => {
+      const assets = rel.assets || [];
+      const pick = (re) => assets.find(a => re.test(a.name));
+      const map = { mac: /macos/i, win: /windows/i, linux: /linux/i };
+      let found = 0;
+      for (const k in map) {
+        const a = pick(map[k]);
+        if (a) {
+          found++;
+          const el = document.getElementById("dl-" + k);
+          el.href = a.browser_download_url;
+          el.querySelector(".file").textContent = `${a.name} · ${(a.size / 1048576).toFixed(0)} MB`;
+        }
+      }
+      if (os && pick(map[os])) document.getElementById("heroDl").href = pick(map[os]).browser_download_url;
+      const date = new Date(rel.published_at).toLocaleDateString("ko-KR");
+      document.getElementById("version").innerHTML =
+        `최신 버전 <b>${rel.tag_name}</b> · ${date} · <a href="${rel.html_url}" target="_blank" rel="noopener">릴리스 노트</a>`;
+      if (!found) document.getElementById("pending").style.display = "block";
+    })
+    .catch(() => {
+      document.getElementById("version").textContent = "";
+      document.getElementById("pending").style.display = "block";
+    });
+</script>
+</body>
+</html>
