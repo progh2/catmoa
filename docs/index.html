@@ -74,6 +74,9 @@
   .mood img { width: 96px; height: 96px; display: block; margin: 0 auto 6px; }
   .mood b { display: block; font-size: 14px; }
   .mood span { font-size: 12px; color: var(--brown-soft); }
+  .mood.play { border-style: dashed; cursor: crosshair; }
+  .mood.play img { transition: transform .15s; }
+  .mood.play:hover img { transform: scale(1.06); }
   @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
   @keyframes chomp { 0%,100% { transform: scale(1) } 50% { transform: scale(1.06) rotate(-2deg) } }
   .food {
@@ -282,6 +285,7 @@
     <p class="lead" style="margin-bottom:0">표정만 봐도 지금 무슨 일을 하는지 알 수 있어요.</p>
     <div class="moods">
       <div class="mood"><img src="cat/idle_1.png" alt="기본"><b>대기 중</b><span>뭐든 던져주세요</span></div>
+      <div class="mood play" id="playCard"><img src="cat/idle_1.png" alt="마우스 따라 놀기" id="playCat"><b>놀아줘요</b><span>마우스를 움직여 보세요 — 시선이 따라와요</span></div>
       <div class="mood"><img src="cat/drag.png" alt="놀람"><b>앗, 파일!</b><span>끌어다 놓기 직전</span></div>
       <div class="mood"><img src="cat/searching.png" alt="서류 찾는 중"><b>서류 뒤지는 중</b><span>문서 읽기 · 쿨메신저 확인</span></div>
       <div class="mood"><img src="cat/eating_1.png" alt="먹는 중"><b>냠냠</b><span>AI가 일정 분석 중</span></div>
@@ -399,6 +403,19 @@ run.cmd       # Windows</pre>
     if (!cat.src.endsWith(src)) cat.src = src;
   }, 450);
   // 앱과 같은 동작: 마우스가 고양이의 어느 사분면에 있는지 보고 시선을 돌린다
+  // '고양이의 하루' 놀아줘요 카드: 카드 위 마우스 사분면에 따라 시선이 따라온다
+  const playCard = document.getElementById("playCard"), playCat = document.getElementById("playCat");
+  if (playCard) {
+    let playDir = "";
+    playCard.addEventListener("mousemove", (e) => {
+      const r = playCat.getBoundingClientRect();
+      const v = e.clientY < r.top + r.height / 2 ? "t" : "b", h = e.clientX < r.left + r.width / 2 ? "l" : "r";
+      const d = "hover_" + v + h;
+      if (d !== playDir) { playDir = d; playCat.src = "cat/" + d + ".png"; }
+    });
+    playCard.addEventListener("mouseleave", () => { playDir = ""; playCat.src = "cat/idle_1.png"; });
+    playCard.addEventListener("click", () => { playCat.src = "cat/happy.png"; setTimeout(() => { playDir = ""; playCat.src = "cat/idle_1.png"; }, 900); });
+  }
   cat.addEventListener("mousemove", (e) => {
     const r = cat.getBoundingClientRect();
     const v = e.clientY < r.top + r.height / 2 ? "t" : "b", h = e.clientX < r.left + r.width / 2 ? "l" : "r";
