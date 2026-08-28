@@ -59,7 +59,7 @@
 |---|---|---|
 | macOS (Apple Silicon) | `catmoa-macos-arm64.dmg` | 더블클릭 → `catmoa.app`을 Applications 로 드래그. 처음 실행 시 "악성 코드가 없음을 확인할 수 없음" 경고가 뜨면 아래 [macOS 첫 실행](#macos-첫-실행) 참고 |
 | Windows 10/11 | `catmoa-windows-x86_64.exe` | 단일 실행 파일 — 원하는 폴더에 두고 더블클릭 (첫 화면까지 몇 초 걸림). 브라우저·SmartScreen 경고가 뜨면 **유지 / 추가 정보 → 실행**. Windows on ARM(Parallels·Surface 등)도 같은 파일을 쓰면 됩니다(x64 에뮬레이션) |
-| Linux (x86_64) | `catmoa-linux-x86_64.tar.gz` | 압축 해제 → `./catmoa/catmoa`. X11 권장 (Wayland는 항상-위 창이 제한될 수 있음) |
+| Linux (x86_64) | `catmoa-linux-x86_64.tar.gz` | 압축 해제 → `./catmoa/catmoa`. X11 권장 (Wayland는 항상-위 창이 제한될 수 있음). `libEGL.so.1` 등이 없다는 오류가 나면 Qt 런타임 설치: `sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 libdbus-1-3 libfontconfig1 libglib2.0-0`. 디스플레이(DISPLAY)가 없는 서버·컨테이너에서는 실행되지 않습니다 |
 
 #### macOS 첫 실행
 서명·공증이 되지 않은 앱이라 macOS가 한 번 막습니다 (macOS 15 Sequoia부터는 "우클릭 → 열기"도 통하지 않습니다). 둘 중 하나로 한 번만 허용하면 됩니다.

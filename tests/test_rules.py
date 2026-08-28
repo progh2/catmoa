@@ -20,6 +20,25 @@ def test_user_prompt_sections():
     assert "태스크 카테고리 규칙" in p2 and "다음 목록 중" not in p2
 
 
+def test_calendar_hint_in_prompt():
+    from src.extract.prompts import calendar_hint
+    h = calendar_hint(date(2026, 6, 8))            # 월요일
+    assert h.startswith("날짜 참고") and "이번 주: 06/08(월)" in h and "06/14(일)" in h
+    assert "다음 주: 06/15(월)" in h and "06/18(목)" in h and "다다음 주: 06/22(월)" in h
+    assert "06/18(목)" in user_prompt("x", date(2026, 6, 8))
+
+
+def test_extractor_drop_before():
+    resp = json.dumps({"items": [
+        {"title": "지난 제출", "date": "2026-06-03", "kind": "task"},
+        {"title": "회의", "date": "2026-06-18", "time": "14:00"},
+    ]})
+    r = Extractor(FakeProvider([resp])).extract(ParsedInput(text="x"), date(2026, 6, 8), drop_before=date(2026, 6, 8))
+    assert [i.title for i in r.items] == ["회의"] and any("지나간 항목 1개" in w for w in r.warnings)
+    r2 = Extractor(FakeProvider([resp])).extract(ParsedInput(text="x"), date(2026, 6, 8))
+    assert len(r2.items) == 2
+
+
 def test_extractor_passes_options_and_category():
     resp = json.dumps({"items": [{"title": "신청서 제출", "date": "2026-09-10", "kind": "task", "category": "학교"}]})
     prov = FakeProvider([resp])

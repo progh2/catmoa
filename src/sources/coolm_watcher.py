@@ -26,10 +26,10 @@ def check_connection(memo_dir: str) -> str:
         return f"✅ 연결 OK — 받은 쪽지가 없습니다 (키 최대 {total})"
 
 
-def message_to_item(m: Message) -> InputItem:
+def message_to_item(m: Message, history_chars: int = 1200) -> InputItem:
     return InputItem(
         kind="coolm",
-        payload=m.text,
+        payload=m.to_text(history_chars),
         source_label=f"쿨메신저: {m.sender or '?'}" + (f" — {m.title[:20]}" if m.title.strip() else ""),
         reference_date=m.received.date(),          # "내일"은 받은 날 기준
         origin_ref=str(m.key),
@@ -96,7 +96,7 @@ class CoolmWatcher(QObject):
             return
         c.last_message_key = max(m.key for m in msgs)
         self._persist()
-        items = [message_to_item(m) for m in msgs if m.body.strip() or m.title.strip()]
+        items = [message_to_item(m, c.history_chars) for m in msgs if m.body.strip() or m.title.strip()]
         log.info("쿨메신저 새 쪽지 %d건 (키 %d 까지)", len(items), c.last_message_key)
         if items:
             self.new_items.emit(items)
@@ -123,7 +123,7 @@ class CoolmWatcher(QObject):
         c = self.config.coolm
         c.last_message_key = max(c.last_message_key, max(m.key for m in msgs))
         self._persist()
-        items = [message_to_item(m) for m in msgs if m.body.strip() or m.title.strip()]
+        items = [message_to_item(m, c.history_chars) for m in msgs if m.body.strip() or m.title.strip()]
         if items:
             self.new_items.emit(items)
         return len(items)

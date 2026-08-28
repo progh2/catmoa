@@ -65,6 +65,7 @@ class CoolmSettings:
     memo_dir: str = ""                  # "" = 자동 탐지
     skip_existing_on_first_run: bool = True
     last_message_key: int = 0
+    history_chars: int = 1200           # 답장에 인용된 이전 대화를 참고용으로 붙일 최대 글자 수 (0 = 제외)
 
 
 @dataclass

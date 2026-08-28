@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import shutil
 import sqlite3
 import tempfile
@@ -33,15 +34,76 @@ class Message:
 
     @property
     def text(self) -> str:
+        return self.to_text()
+
+    def to_text(self, history_chars: int = 1200) -> str:
+        """LLM 입력용 텍스트. 답장에 쌓인 이전 대화는 분리해 '참고용'으로 뒤에 붙인다 (history_chars=0 이면 제외)."""
         parts = []
         if self.title.strip():
             parts.append(f"제목: {self.title.strip()}")
         if self.sender.strip():
             parts.append(f"보낸 사람: {self.sender.strip()}")
         parts.append(f"받은 시각: {self.received:%Y-%m-%d %H:%M}")
-        parts.append("")
-        parts.append(self.body.strip())
+        recent, older = split_recent(self.body)
+        if older:
+            parts.append("")
+            parts.append("[최근 내용]")
+            parts.append(recent or "(본문 없음 — 아래 이전 대화만 있음)")
+            if history_chars > 0:
+                parts.append("")
+                parts.append("[이전 대화 (참고용 — 최근 내용이 가리키는 것을 해석할 때만 참고, 지나간 일정은 추출하지 말 것)]")
+                parts.append(older[:history_chars] + ("\n…(이하 생략)" if len(older) > history_chars else ""))
+        else:
+            parts.append("")
+            parts.append(recent)
         return "\n".join(parts)
+
+
+# ---------------------------------------------------------------- 인용된 이전 대화 분리
+
+_QUOTE_LINE_RE = re.compile(
+    r"^\s*("
+    r"-{3,}\s*(original\s*message|원본\s*메시지|원본|이전\s*(메시지|쪽지|대화))\s*-{3,}"   # ----- 원본 메시지 -----
+    r"|[-=_─━]{6,}"                                                                    # 긴 구분선
+    r"|on\s.+\swrote:"                                                                 # On ... wrote:
+    r"|\d{4}[./-]\s?\d{1,2}[./-]\s?\d{1,2}.*(님이\s*(작성|씀)|wrote|작성함?)\s*[:：]?"     # 2026-06-08 홍길동님이 작성:
+    r"|(re|회신|답장|fw|fwd|전달)\s*[:：]\s*$"
+    r")\s*$",
+    re.I,
+)
+_HEADER_KEY_RE = re.compile(r"^\s*(from|보낸\s*사람|발신|발신자|sent|보낸\s*날짜|날짜|date|to|받는\s*사람|수신|subject|제목)\s*[:：]", re.I)
+_GT_RE = re.compile(r"^\s*>")
+
+
+def split_recent(body: str) -> tuple[str, str]:
+    """(최근 내용, 인용된 이전 대화). 이전 대화가 없으면 두 번째는 ''."""
+    lines = (body or "").replace("\r", "").split("\n")
+    cut = None
+    for i, line in enumerate(lines):
+        if i == 0 and not line.strip():
+            continue
+        if _QUOTE_LINE_RE.match(line):
+            cut = i
+            break
+        # 헤더 블록: '보낸 사람:' 류가 2줄 이상 연달아 오면 인용 시작
+        if _HEADER_KEY_RE.match(line):
+            window = [l for l in lines[i:i + 4] if l.strip()]
+            if sum(1 for l in window if _HEADER_KEY_RE.match(l)) >= 2 and i > 0:
+                cut = i
+                break
+        # '>' 인용: 이 줄부터 끝까지 비어있지 않은 줄의 대부분이 '>' 로 시작
+        if _GT_RE.match(line) and i > 0:
+            rest = [l for l in lines[i:] if l.strip()]
+            if rest and sum(1 for l in rest if _GT_RE.match(l)) >= max(2, int(len(rest) * 0.6)):
+                cut = i
+                break
+    if cut is None:
+        return (body or "").strip(), ""
+    recent = "\n".join(lines[:cut]).strip()
+    older = "\n".join(lines[cut:]).strip()
+    # 인용 기호 제거해 읽기 쉽게
+    older = "\n".join(re.sub(r"^\s*(>\s?)+", "", l) for l in older.split("\n")).strip()
+    return recent, older
 
 
 def default_memo_dir() -> str:

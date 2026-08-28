@@ -35,7 +35,9 @@ class Extractor:
 
     def extract(self, parsed: ParsedInput, ref: date | None = None, source: str = "", *,
                 kind_rules: str = "", category_rules: str = "",
-                categories: list[str] | tuple[str, ...] = ()) -> ExtractionResult:
+                categories: list[str] | tuple[str, ...] = (),
+                drop_before: date | None = None) -> ExtractionResult:
+        """drop_before: 이 날짜보다 앞선 항목은 버린다 (예: 쪽지 수신일 이전의 지나간 일정)."""
         ref = ref or date.today()
         source = source or parsed.source
         warnings: list[str] = []
@@ -74,6 +76,12 @@ class Extractor:
         items, skipped = _to_items(data, ref, source)
         if skipped:
             warnings.append(f"날짜를 확정할 수 없는 항목 {skipped}개를 제외했습니다.")
+        if drop_before is not None:
+            past = [i for i in items if i.start.date() < drop_before]
+            if past:
+                items = [i for i in items if i.start.date() >= drop_before]
+                warnings.append(f"{drop_before:%m/%d} 이전의 지나간 항목 {len(past)}개를 제외했습니다: "
+                                + ", ".join(i.title[:20] for i in past[:3]))
         return ExtractionResult(items=items, warnings=warnings, raw_text=raw)
 
     def _call(self, req: LLMRequest) -> str:

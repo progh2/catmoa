@@ -91,7 +91,9 @@ class PipelineWorker(QThread):
             parsed = parse_item(item)
             self.phase.emit("eating")
             provider = self._factory()
-            opts = self._options() if self._options else {}
+            opts = dict(self._options() if self._options else {})
+            if item.kind == "coolm":
+                opts["drop_before"] = item.reference_date   # 쪽지 수신일 이전 = 인용된 옛 대화의 지나간 일정
             extraction = Extractor(provider).extract(parsed, item.reference_date, item.source_label, **opts)
             log.info("추출 완료: %s → %d건", item.short, len(extraction.items))
             self.result.emit(PipelineResult(item, extraction))

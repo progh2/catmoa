@@ -24,6 +24,9 @@ SYSTEM_PROMPT = """당신은 한국 학교 교사의 일정 비서입니다. 입
 10. 주간업무계획표처럼 **부서별 칸**이 있는 표는 모든 부서의 항목을 추출합니다.
 11. 문서 제목이나 표 머리글에 기간(예: "2026. 6. 8. ~ 6. 12.")이 있으면, 표 안의 날짜 숫자("8", "9", "10")는
     그 기간에 속한 날짜로 해석합니다. 기준일의 월을 함부로 적용하지 마세요.
+12. 입력이 "[최근 내용]"과 "[이전 대화 (참고용…)]"로 나뉘어 있으면(답장이 쌓인 쪽지) **최근 내용에서만** 일정을 추출합니다.
+    이전 대화는 최근 내용이 가리키는 대상("그 회의", "아까 말한 날짜")을 해석할 때만 참고하고,
+    이전 대화에만 있는 지나간 일정은 추출하지 않습니다.
 
 출력은 아래 JSON 하나만. 다른 텍스트 금지.
 {
@@ -45,10 +48,28 @@ SYSTEM_PROMPT = """당신은 한국 학교 교사의 일정 비서입니다. 입
 일정이 하나도 없으면 {"items": []} 를 반환합니다."""
 
 
+def calendar_hint(ref: date) -> str:
+    """상대 날짜 계산을 돕는 3주치 달력 (작은 모델이 '다음 주 목요일'을 틀리지 않게)."""
+    from datetime import timedelta
+
+    monday = ref - timedelta(days=ref.weekday())
+    rows = []
+    for w, label in enumerate(("이번 주", "다음 주", "다다음 주")):
+        days = [monday + timedelta(days=7 * w + i) for i in range(7)]
+        rows.append(f"{label}: " + " ".join(f"{d:%m/%d}({WEEKDAYS_KO[d.weekday()]})" for d in days))
+    # 상대 표현 → 날짜 직접 대응표 (계산 실수 방지). "다음 주 X요일" 은 기준일 다음 주의 해당 요일.
+    rel = [f"내일={ref + timedelta(days=1):%m/%d}", f"모레={ref + timedelta(days=2):%m/%d}"]
+    for w, label in ((0, "이번 주"), (1, "다음 주")):
+        rel.append(label + " " + " ".join(
+            f"{WEEKDAYS_KO[i]}={monday + timedelta(days=7 * w + i):%m/%d}" for i in range(7)))
+    return ("날짜 참고 (기준일이 속한 주부터) — " + " / ".join(rows)
+            + "\n상대 표현 대응표: " + "; ".join(rel))
+
+
 def user_prompt(text: str, ref: date, source: str = "", has_images: bool = False, *,
                 kind_rules: str = "", category_rules: str = "", categories: list[str] | tuple[str, ...] = ()) -> str:
     wd = WEEKDAYS_KO[ref.weekday()]
-    parts = [f"기준일: {ref.isoformat()} ({wd}요일)"]
+    parts = [f"기준일: {ref.isoformat()} ({wd}요일)", calendar_hint(ref)]
     if source:
         parts.append(f"출처: {source}")
     if has_images:
