@@ -254,7 +254,40 @@ class _Row(QFrame):
                         tasklist_name=self.tasklist.currentText() if self.tasklist.currentData() else "")
 
 
+class EditDialog(QDialog):
+    """카드의 '수정…' — 항목 하나를 상세 편집 (_Row 전체: 대상·목록·제목·날짜·시간·종료·장소·알람·날짜 없음)."""
+
+    def __init__(self, row: _Row, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("상세 수정")
+        self.setMinimumWidth(820)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self._row = row
+        lay = QVBoxLayout(self)
+        lay.addWidget(row)
+        row.show()
+        foot = QHBoxLayout()
+        foot.addStretch(1)
+        cancel = QPushButton("닫기")
+        cancel.clicked.connect(self.accept)
+        foot.addWidget(cancel)
+        lay.addLayout(foot)
+
+    def done(self, r: int) -> None:
+        # _Row 는 ReviewDialog 가 계속 쓰므로 이 창과 함께 파괴되지 않게 떼어낸다
+        self.layout().removeWidget(self._row)
+        self._row.setParent(None)
+        self._row.hide()
+        super().done(r)
+
+
 class ReviewDialog(QDialog):
+    """카드 한 장씩 넘기며 처리하는 검토 창.
+
+    각 항목은 _Row(상세 편집기)를 모델로 갖고, 카드는 제목·일시·장소만 보여준다.
+    📅 / ✅ / 📅+✅ / 건너뛰기 를 누르면 다음 카드로, 마지막엔 요약 카드 → 등록.
+    알람은 설정의 기본값(_Row 초기값)을 그대로 쓰고, 바꾸려면 '수정…'.
+    """
     submitted = Signal(list)   # list[Decision]
 
     def __init__(self, items: list[ScheduleItem], settings: cfg.ScheduleSettings, *,
@@ -262,84 +295,256 @@ class ReviewDialog(QDialog):
                  preview_text: str = "", tasklists: list[tuple[str, str]] | None = None,
                  parent: QWidget | None = None):
         super().__init__(parent)
-        self.setWindowTitle(f"일정 검토 — {source_label}" if source_label else "일정 검토")
-        self.setMinimumWidth(820)
-        self.resize(880, min(160 + 130 * max(len(items), 1), 720))
+        self.setWindowTitle(f"catmoa — {source_label}" if source_label else "catmoa")
+        self.setMinimumWidth(460)
+        self.resize(500, 340)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         tasklists = tasklists or []
         self._settings = settings
+        self._warnings = list(warnings or [])
+        self._preview_text = preview_text
+        self._idx = 0
 
-        head = QLabel(f"<b>{len(items)}개</b>의 일정을 찾았습니다. 항목마다 <b>등록 대상</b>(📅 캘린더 / ✅ 태스크)을 고르세요 — "
-                      "둘 다 고르면 캘린더엔 마감일로, 태스크엔 할 일로 들어가고, <b>둘 다 끄면 등록하지 않습니다</b>." if items
-                      else "일정을 찾지 못했습니다.")
-        head.setWordWrap(True)
-        lay = QVBoxLayout(self)
-        lay.addWidget(head)
-        for w in warnings or []:
-            wl = QLabel(f"⚠ {w}")
-            wl.setStyleSheet("color: #b8860b;")
-            lay.addWidget(wl)
-
-        bulk = QHBoxLayout()
-        for label, fn in (("모두 📅 캘린더", lambda: self._bulk_targets({"calendar"})),
-                          ("모두 ✅ 태스크", lambda: self._bulk_targets({"task"})),
-                          ("모두 📅+✅", lambda: self._bulk_targets({"calendar", "task"})),
-                          ("모두 끄기 (등록 안 함)", lambda: self._bulk_check(False))):
-            b = QPushButton(label)
-            b.clicked.connect(fn)
-            bulk.addWidget(b)
-        bulk.addStretch(1)
-        lay.addLayout(bulk)
-
+        # 모델: 항목별 상세 편집기 (숨김 상태로 보관, '수정…' 때만 EditDialog 에 붙임)
         self.rows: list[_Row] = []
-        body = QWidget()
-        body_lay = QVBoxLayout(body)
-        body_lay.setContentsMargins(0, 0, 0, 0)
         for it in items:
             row = _Row(it, settings, tasklists)
+            row.hide()
             self.rows.append(row)
-            body_lay.addWidget(row)
-        body_lay.addStretch(1)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(body)
-        lay.addWidget(scroll, 1)
+        self._done: list[bool] = [False] * len(self.rows)   # 카드에서 처리(선택/건너뜀)했는지
 
-        if preview_text:
-            self.preview_btn = QPushButton("원본 보기 ▾")
-            self.preview_btn.setCheckable(True)
-            self.preview = QPlainTextEdit(preview_text[:4000])
-            self.preview.setReadOnly(True)
-            self.preview.setMaximumHeight(160)
-            self.preview.hide()
-            self.preview_btn.toggled.connect(self.preview.setVisible)
-            lay.addWidget(self.preview_btn)
-            lay.addWidget(self.preview)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 14, 18, 14)
+        lay.setSpacing(10)
 
+        # 진행 표시
+        top = QHBoxLayout()
+        self.progress_label = QLabel()
+        self.progress_label.setStyleSheet("color: palette(mid); font-size: 12px;")
+        self.source_label = QLabel(source_label)
+        self.source_label.setStyleSheet("color: palette(mid); font-size: 12px;")
+        top.addWidget(self.source_label)
+        top.addStretch(1)
+        top.addWidget(self.progress_label)
+        lay.addLayout(top)
+
+        # 카드
+        self.card = QFrame(objectName="reviewCard")
+        self.card.setStyleSheet(
+            "#reviewCard { background: palette(base); border: 1px solid palette(mid); border-radius: 14px; }")
+        card_lay = QVBoxLayout(self.card)
+        card_lay.setContentsMargins(22, 20, 22, 18)
+        card_lay.setSpacing(8)
+        self.card_title = QLabel()
+        self.card_title.setWordWrap(True)
+        self.card_title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        self.card_when = QLabel()
+        self.card_when.setStyleSheet("font-size: 14px;")
+        self.card_where = QLabel()
+        self.card_where.setStyleSheet("font-size: 13px; color: palette(mid);")
+        self.card_where.setWordWrap(True)
+        self.card_choice = QLabel()
+        self.card_choice.setStyleSheet("font-size: 12px; color: palette(mid);")
+        card_lay.addWidget(self.card_title)
+        card_lay.addWidget(self.card_when)
+        card_lay.addWidget(self.card_where)
+        card_lay.addStretch(1)
+        card_lay.addWidget(self.card_choice)
+        lay.addWidget(self.card, 1)
+
+        # 주요 선택 버튼
+        choose = QHBoxLayout()
+        choose.setSpacing(8)
+        self.btn_cal = QPushButton("📅 캘린더")
+        self.btn_task = QPushButton("✅ 태스크")
+        self.btn_both = QPushButton("📅+✅ 둘 다")
+        for b, t in ((self.btn_cal, {"calendar"}), (self.btn_task, {"task"}), (self.btn_both, {"calendar", "task"})):
+            b.setMinimumHeight(40)
+            b.clicked.connect(lambda _=False, tt=t: self._choose(tt))
+            choose.addWidget(b, 1)
+        lay.addLayout(choose)
+
+        # 보조 버튼
+        aux = QHBoxLayout()
+        self.btn_prev = QPushButton("← 이전")
+        self.btn_prev.clicked.connect(self._prev)
+        self.btn_skip = QPushButton("건너뛰기")
+        self.btn_skip.clicked.connect(self._skip)
+        self.btn_edit = QPushButton("수정…")
+        self.btn_edit.clicked.connect(self._edit)
+        self.btn_rest = QPushButton("나머지 기본대로")
+        self.btn_rest.setToolTip("남은 항목을 AI 제안(또는 설정의 기본 대상)대로 한 번에 처리")
+        self.btn_rest.clicked.connect(self._rest_default)
+        aux.addWidget(self.btn_prev)
+        aux.addStretch(1)
+        aux.addWidget(self.btn_skip)
+        aux.addWidget(self.btn_edit)
+        aux.addWidget(self.btn_rest)
+        lay.addLayout(aux)
+
+        # 요약 카드 하단 (등록/취소)
         foot = QHBoxLayout()
         foot.addStretch(1)
-        cancel = QPushButton("취소")
-        cancel.clicked.connect(self.reject)
+        self.btn_cancel = QPushButton("취소")
+        self.btn_cancel.clicked.connect(self.reject)
         self.ok = QPushButton("등록")
-        self.ok.setDefault(True)
-        self.ok.setEnabled(bool(items))
+        self.ok.setMinimumHeight(40)
         self.ok.clicked.connect(self._submit)
-        foot.addWidget(cancel)
+        foot.addWidget(self.btn_cancel)
         foot.addWidget(self.ok)
         lay.addLayout(foot)
 
-    # 하위 호환 (테스트/외부에서 단일 대상 일괄 지정)
+        self.note = QLabel()
+        self.note.setWordWrap(True)
+        self.note.setStyleSheet("color: #b8860b; font-size: 11px;")
+        lay.addWidget(self.note)
+
+        # 단축키: 1/2/3 선택, S 건너뛰기, E 수정, ← 이전
+        from PySide6.QtGui import QShortcut, QKeySequence
+        for key, fn in (("1", lambda: self._choose({"calendar"})), ("2", lambda: self._choose({"task"})),
+                        ("3", lambda: self._choose({"calendar", "task"})), ("S", self._skip), ("E", self._edit),
+                        ("Left", self._prev), ("Backspace", self._prev)):
+            QShortcut(QKeySequence(key), self, activated=fn)
+
+        self._render()
+
+    # ------------------------------------------------------------ 표시
+    @property
+    def at_summary(self) -> bool:
+        return self._idx >= len(self.rows)
+
+    def _render(self) -> None:
+        n = len(self.rows)
+        for w in (self.btn_cal, self.btn_task, self.btn_both, self.btn_skip, self.btn_edit, self.btn_rest):
+            w.setVisible(not self.at_summary)
+        self.btn_prev.setVisible(n > 0 and self._idx > 0)
+        self.ok.setVisible(self.at_summary)
+        self.btn_cancel.setVisible(True)
+        self.note.setText("  ·  ".join(self._warnings) if self._warnings else "")
+        self.note.setVisible(bool(self._warnings))
+
+        if n == 0:
+            self.progress_label.setText("")
+            self.card_title.setText("일정을 찾지 못했어요")
+            self.card_when.setText("")
+            self.card_where.setText("")
+            self.card_choice.setText("")
+            self.ok.setEnabled(False)
+            return
+
+        if self.at_summary:
+            ds = self.decisions()
+            cal = sum(1 for d in ds if "calendar" in d.targets)
+            task = sum(1 for d in ds if "task" in d.targets)
+            skipped = n - len(ds)
+            self.progress_label.setText(f"{n} / {n}")
+            self.card_title.setText(f"{len(ds)}개 등록 준비 완료" if ds else "등록할 항목이 없어요")
+            parts = []
+            if cal:
+                parts.append(f"📅 캘린더 {cal}")
+            if task:
+                parts.append(f"✅ 태스크 {task}")
+            if skipped:
+                parts.append(f"건너뜀 {skipped}")
+            self.card_when.setText("  ·  ".join(parts))
+            self.card_where.setText("\n".join(f"• {d.item.title} — {d.item.describe_when()}" for d in ds[:8])
+                                    + ("\n…" if len(ds) > 8 else ""))
+            self.card_choice.setText("← 이전 으로 돌아가 바꿀 수 있어요")
+            self.ok.setEnabled(bool(ds))
+            self.ok.setDefault(True)
+            return
+
+        row = self.rows[self._idx]
+        it = row.item
+        self.progress_label.setText(f"{self._idx + 1} / {n}")
+        self.card_title.setText(it.title)
+        when = "날짜 없음 (마감 없는 할 일)" if row.no_date.isChecked() else self._describe_row(row)
+        self.card_when.setText(("🗓  " if not row.no_date.isChecked() else "☑  ") + when)
+        where = []
+        if row.location.text().strip():
+            where.append("📍 " + row.location.text().strip())
+        if row.task.isChecked() and row.tasklist.currentData():
+            where.append("📂 " + row.tasklist.currentText())
+        self.card_where.setText("   ".join(where))
+        # 현재 선택 상태 (돌아왔을 때)
+        t = row.targets()
+        label = {frozenset({"calendar"}): "📅 캘린더", frozenset({"task"}): "✅ 태스크",
+                 frozenset({"calendar", "task"}): "📅+✅ 둘 다"}.get(frozenset(t), "건너뛰기")
+        self.card_choice.setText(f"{'선택됨' if self._done[self._idx] else 'AI 제안'}: {label}")
+        self.btn_cal.setEnabled(not row.no_date.isChecked())
+        self.btn_both.setEnabled(not row.no_date.isChecked())
+        # 기본 제안 버튼을 기본(Enter)으로
+        for b in (self.btn_cal, self.btn_task, self.btn_both):
+            b.setDefault(False)
+        {frozenset({"calendar"}): self.btn_cal, frozenset({"task"}): self.btn_task,
+         frozenset({"calendar", "task"}): self.btn_both}.get(frozenset(t), self.btn_task).setDefault(True)
+
+    @staticmethod
+    def _describe_row(row: _Row) -> str:
+        d = row.date.date()
+        s = f"{d.toString('yyyy-MM-dd')} ({'월화수목금토일'[d.dayOfWeek() - 1]})"
+        if row.all_day.isChecked():
+            if row.has_end.isChecked() and row.end_date.date() != d:
+                s += f" ~ {row.end_date.date().toString('yyyy-MM-dd')}"
+            return s + "  종일"
+        s += " " + row.time.time().toString("HH:mm")
+        if row.has_end.isChecked():
+            s += "~" + row.end_time.time().toString("HH:mm")
+        return s
+
+    # ------------------------------------------------------------ 동작
+    def _choose(self, targets: set[str]) -> None:
+        if self.at_summary or not self.rows:
+            return
+        row = self.rows[self._idx]
+        if row.no_date.isChecked():
+            targets = targets & {"task"} or {"task"}
+        row.set_targets(set(targets))
+        self._done[self._idx] = True
+        self._idx += 1
+        self._render()
+
+    def _skip(self) -> None:
+        if self.at_summary or not self.rows:
+            return
+        self.rows[self._idx].set_targets(set())
+        self._done[self._idx] = True
+        self._idx += 1
+        self._render()
+
+    def _prev(self) -> None:
+        if self._idx > 0:
+            self._idx -= 1
+            self._render()
+
+    def _edit(self) -> None:
+        if self.at_summary or not self.rows:
+            return
+        dlg = EditDialog(self.rows[self._idx], self)
+        dlg.exec()
+        self._render()
+
+    def _rest_default(self) -> None:
+        """남은 카드를 현재 제안(_Row 초기 대상)대로 처리하고 요약으로."""
+        for i in range(self._idx, len(self.rows)):
+            self._done[i] = True
+        self._idx = len(self.rows)
+        self._render()
+
+    # ------------------------------------------------------------ 하위 호환 / 일괄
     def _bulk_target(self, key: str):
         self._bulk_targets({key})
 
     def _bulk_targets(self, targets: set[str]):
         for r in self.rows:
             r.set_targets(targets)
+        self._render()
 
     def _bulk_check(self, on: bool):
         """on=False: 모두 끄기(등록 안 함), on=True: 기본 대상으로 되돌리기."""
         for r in self.rows:
             r.set_targets(default_targets(r.item, self._settings) if on else set())
+        self._render()
 
     def decisions(self) -> list[Decision]:
         return [d for r in self.rows if (d := r.decision()) is not None]

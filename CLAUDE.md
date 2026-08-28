@@ -12,7 +12,8 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.4.9 — 고양이 크기 배율(#45: config.ui.cat_scale 0.5~3.0, cat_faces.load_cat_images(scale), CatWidget.set_scale/_lock_size, HairpinBadge.set_scale, 설정 일반 탭 QSlider). 랜딩 '놀아줘요' 카드(#44), README 아이콘(#43). v1.4.8 릴리스 완료
+- intent: v1.4.10 — 검토창 카드형 개편(#47): ReviewDialog 는 _Row(숨김 모델) 위의 카드 위저드(📅/✅/둘 다/건너뛰기/수정…/나머지 기본대로/이전, 요약 카드→등록, 단축키 1/2/3/S/E). EditDialog 는 _Row 를 붙였다 떼어냄(파괴 방지). 알람은 설정 기본값. v1.4.9 릴리스 완료
+- (이전) v1.4.9 — 고양이 크기 배율(#45: config.ui.cat_scale 0.5~3.0, cat_faces.load_cat_images(scale), CatWidget.set_scale/_lock_size, HairpinBadge.set_scale, 설정 일반 탭 QSlider). 랜딩 '놀아줘요' 카드(#44), README 아이콘(#43). v1.4.8 릴리스 완료
 - (이전) v1.4.8 — 캘린더 설명·태스크 메모 하단에 원문(ScheduleItem.source_text, 설정 source_text_chars 기본 1500, 0=끔) (#42). v1.4.7: 설정 '교사' 탭(#41): TeacherSettings(출근/퇴근, 학교급 40/45/50, 교시 7개, 점심, autofill/describe) → 프롬프트 '시간표 참고' + 규칙 16. Ollama 실검증 4/4. v1.4.6 릴리스 완료(4방향 호버, 파비콘)
 - (이전) v1.4.6 — 4방향 호버 시선(hover_tl/tr/bl/br, 사용자 이미지 4장 → cat-src, prepare_cat OPTIONAL 매핑), 파비콘(favicon.ico/apple-touch-icon, ?v=3), 랜딩 시선 추적. **규칙: 사용자 요청은 먼저 이슈 등록 후 커밋에 closes #N** (#33~#40 소급 등록, 마일스톤 v1.5 표정·편의)
 - (이전) v1.4.5 — Windows 업데이트 "Security validation failure" 원인: 얼린 앱이 띄운 cmd 가 _PYI_*/_MEIPASS2 환경변수를 새 exe 에 상속 → updater.clean_env() 로 제거. 요청 표현 있으면 날짜 없어도 task(재요청 안전장치). 자동 실행(src/autostart.py: LaunchAgent/레지스트리 Run/.desktop). 업데이트 배지 = HairpinBadge(회전 빨간 핀, 이미지 모드는 오른쪽 귀 옆). README 현행화. ≤1.4.4 Windows 는 env 버그로 자동 업데이트 실패 → v1.4.5 수동 설치 1회
