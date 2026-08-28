@@ -40,7 +40,7 @@
 | Google 로그인 | JSON 파일 없이 브라우저 로그인만으로 연결 (토큰은 OS 키체인에 저장) |
 | Google Tasks 인박스 | 휴대폰 등에서 대충 적어둔 "인박스" 목록의 항목을 불러와 분석·정리 (목록명 변경 가능) |
 | 쿨메신저 연동 (선택) | 새로 받은 쪽지를 기본 30초 간격으로 확인해 자동 분석. 사용 여부·간격 설정 가능 (Windows) |
-| LLM 선택 | Claude / ChatGPT(OpenAI) / 로컬 Ollama 중 선택, 사용 가능한 모델 목록 조회, 연결 테스트 |
+| LLM 선택 | Claude / ChatGPT(OpenAI) / Gemini(Google) / Solar(Upstage) / 로컬 Ollama 중 선택, 사용 가능한 모델 목록 조회, 연결 테스트. Solar는 이미지를 Upstage 문서 인식(OCR)으로 읽음 |
 | 알람 | 등록 시 알람 여부 선택, 기본 "N분 전"은 설정에서 변경 |
 
 ## 지원 환경

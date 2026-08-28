@@ -123,6 +123,8 @@ def _from_dict(cls: type, data: Any) -> Any:
 
 SECRET_CLAUDE_API_KEY = "claude_api_key"
 SECRET_OPENAI_API_KEY = "openai_api_key"
+SECRET_GEMINI_API_KEY = "gemini_api_key"
+SECRET_UPSTAGE_API_KEY = "upstage_api_key"
 SECRET_GOOGLE_TOKEN = "google_token"
 
 _KEYRING_SERVICE = "catmoa"

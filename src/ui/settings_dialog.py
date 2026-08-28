@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from src import config as cfg
-from src.llm import PROVIDERS, create_provider
+from src.llm import KEY_HELP, PROVIDERS, SECRET_FOR_PROVIDER, create_provider
 from src.llm.base import LLMError
 
 
@@ -123,7 +123,8 @@ class SettingsDialog(QDialog):
         form.addRow("", row2)
 
         note = QLabel("입력한 문서·이미지·쪽지 내용이 선택한 공급자로 전송됩니다. "
-                      "외부 전송이 걱정되면 Ollama(로컬)를 선택하세요. 이미지 분석에는 비전 지원 모델이 필요합니다.")
+                      "외부 전송이 걱정되면 Ollama(로컬)를 선택하세요. 이미지 분석에는 비전 지원 모델이 필요합니다 "
+                      "(Solar는 Upstage 문서 인식(OCR)을 거쳐 이미지를 읽습니다).")
         note.setWordWrap(True)
         note.setStyleSheet("color: palette(mid); font-size: 11px;")
         form.addRow(note)
@@ -142,8 +143,8 @@ class SettingsDialog(QDialog):
         self.ollama_url.setVisible(is_ollama)
         self.ollama_url_label.setVisible(is_ollama)
         if not is_ollama:
-            secret = cfg.SECRET_CLAUDE_API_KEY if key == "claude" else cfg.SECRET_OPENAI_API_KEY
-            self.api_key.setText(cfg.get_secret(secret) or "")
+            self.api_key.setText(cfg.get_secret(SECRET_FOR_PROVIDER[key]) or "")
+            self.api_key.setPlaceholderText(f"API 키 — 발급: {KEY_HELP.get(key, '')}")
         self.check_result.setText("")
 
     def _make_provider(self):
@@ -365,8 +366,8 @@ class SettingsDialog(QDialog):
         typed = self.model.currentText().strip()
         c.llm.model = data if (data and self.model.itemText(idx) == typed) else typed.split(" (")[0]
         c.llm.ollama_url = self.ollama_url.text().strip() or "http://localhost:11434"
-        if key in ("claude", "openai"):
-            secret = cfg.SECRET_CLAUDE_API_KEY if key == "claude" else cfg.SECRET_OPENAI_API_KEY
+        if key in SECRET_FOR_PROVIDER:
+            secret = SECRET_FOR_PROVIDER[key]
             val = self.api_key.text().strip()
             if val:
                 cfg.set_secret(secret, val)

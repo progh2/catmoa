@@ -84,8 +84,9 @@
 ### FR-5 LLM 설정
 | 코드 | 요구사항 |
 |---|---|
-| FR-5.1 | 공급자: Claude(anthropic) / OpenAI / Ollama |
-| FR-5.2 | 모델 목록 조회 — Claude `models.list`, OpenAI `models.list`, Ollama `GET /api/tags` |
+| FR-5.1 | 공급자: Claude(anthropic) / OpenAI / Gemini(REST) / Upstage Solar(OpenAI 호환) / Ollama |
+| FR-5.2 | 모델 목록 조회 — Claude·OpenAI·Upstage `models.list`, Gemini `GET /v1beta/models`, Ollama `GET /api/tags` |
+| FR-5.6 | Solar 채팅 모델은 이미지를 받지 않으므로 Upstage Document Parse(OCR)로 텍스트화 후 분석 |
 | FR-5.3 | 연결 테스트 — 짧은 프롬프트로 응답 확인, 결과·지연시간 표시 |
 | FR-5.4 | API 키는 keyring 저장 |
 | FR-5.5 | 비전 미지원 모델 선택 시 이미지 입력에 경고 |
