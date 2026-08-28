@@ -4,14 +4,18 @@ from __future__ import annotations
 import logging
 from collections import deque
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 
 from src import config as cfg
+from src.gsync.registrar import Registrar, RegistrationReport
+from src.gsync.tasks import TasksClient
 from src.llm import create_provider
 from src.pipeline.worker import PipelineFailure, PipelineResult, PipelineWorker
+from src.sources.inbox import fetch_inbox_items
 from src.ui.cat_widget import CatWidget
 from src.ui.review_dialog import Decision, ReviewDialog
-from src.ui.settings_dialog import SettingsDialog
+from src.ui.settings_dialog import SettingsDialog, _Task
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +44,8 @@ class AppController:
 
         self._pending: deque[PipelineResult] = deque()
         self._review: ReviewDialog | None = None
+        self._tasks: list[_Task] = []
+        self._boxes: list[QMessageBox] = []
 
     # ------------------------------------------------------------ 입력 → 큐
     def on_items(self, items: list) -> None:
@@ -84,18 +90,41 @@ class AppController:
         self._review = None
         self._show_next_review()
 
-    # ------------------------------------------------------------ 등록 (v0.3에서 Registrar 연결)
+    # ------------------------------------------------------------ 등록
     def register(self, decisions: list[Decision], res: PipelineResult) -> None:
         if not decisions:
             return
-        if self.registrar is None:
-            lines = [f"{'📅' if d.target == 'calendar' else '✅'} {d.item.describe_when()}  {d.item.title}"
-                     + (f"  ⏰{d.alarm_minutes}분 전" if d.alarm_minutes is not None else "")
-                     for d in decisions]
-            QMessageBox.information(self.cat, "등록 (미리보기)",
-                                    "Google 연동은 v0.3에서 연결됩니다. 선택한 항목:\n\n" + "\n".join(lines))
+        if not self.google.is_logged_in():
+            QMessageBox.warning(self.cat, "catmoa", "Google에 로그인되어 있지 않습니다.\n설정 → Google 에서 로그인한 뒤 다시 등록하세요.")
             return
-        self.registrar.register(decisions, res)
+        origin = None
+        if res.item.kind == "inbox_task" and res.item.origin_ref and ":" in res.item.origin_ref:
+            origin = tuple(res.item.origin_ref.split(":", 1))
+        registrar = Registrar(self.google, self.config.schedule)
+        self.cat.set_busy(True, "eating")
+        self.cat.face.setToolTip("Google에 등록 중…")
+        self._run_bg(lambda: registrar.register(decisions, origin_task=origin),
+                     self._on_registered, lambda m: self._on_registered(RegistrationReport(failures=[m])))
+
+    def _on_registered(self, rep: RegistrationReport) -> None:
+        if rep.ok:
+            self.cat.set_busy(False)
+            self.cat.face.setToolTip(f"등록 완료: {len(rep.successes)}건")
+        else:
+            self.cat.show_error(f"등록 실패 {len(rep.failures)}건")
+            box = QMessageBox(QMessageBox.Icon.Warning, "등록 결과", rep.summary(), parent=None)
+            box.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+            box.show()
+            self._boxes.append(box)
+        log.info("등록 결과: %s", rep.summary().replace("\n", " | "))
+
+    def _run_bg(self, fn, on_done, on_error) -> None:
+        t = _Task(fn)
+        t.done.connect(on_done)
+        t.error.connect(on_error)
+        t.finished.connect(lambda: self._tasks.remove(t) if t in self._tasks else None)
+        self._tasks.append(t)
+        t.start()
 
     # ------------------------------------------------------------ 기타
     def open_settings(self) -> None:
@@ -108,7 +137,32 @@ class AppController:
         log.info("설정 저장: llm=%s/%s", config.llm.provider, config.llm.model)
 
     def import_inbox(self) -> None:
-        QMessageBox.information(self.cat, "catmoa", "인박스 가져오기는 v0.3(#16)에서 연결됩니다.")
+        if not self.google.is_logged_in():
+            QMessageBox.warning(self.cat, "catmoa", "Google에 로그인되어 있지 않습니다.\n설정 → Google 에서 로그인하세요.")
+            return
+        name = self.config.schedule.inbox_list_name
+        self.cat.set_busy(True, "thinking")
+        self.cat.face.setToolTip(f"Google Tasks '{name}' 가져오는 중…")
+
+        def fetch():
+            return fetch_inbox_items(TasksClient(self.google.tasks_service()), name)
+
+        def done(result):
+            items, _ = result
+            if not items:
+                self.cat.set_busy(False)
+                self.cat.face.setToolTip(f"'{name}' 목록에 미완료 항목이 없습니다.")
+                return
+            self.on_items(items)
+
+        def err(msg):
+            self.cat.show_error(msg)
+            box = QMessageBox(QMessageBox.Icon.Warning, "인박스 가져오기", msg, parent=None)
+            box.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+            box.show()
+            self._boxes.append(box)
+
+        self._run_bg(fetch, done, err)
 
     def quit(self) -> None:
         self.worker.stop(1000)
