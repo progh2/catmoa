@@ -70,6 +70,29 @@ def test_default_memo_dir_scans_candidates(tmp_path, monkeypatch):
     assert default_memo_dir() == str(tmp_path / "local" / "CoolMessenger" / "Memo")
 
 
+def test_coolm_disabled_on_non_windows(app, tmp_path, monkeypatch):
+    import platform as _pl
+    from src.ui import settings_dialog as sd
+    monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr(sd.platform, "system", lambda: "Darwin")
+    c = cfg.Config()
+    dlg = SettingsDialog(c)
+    assert not dlg.coolm_enabled.isEnabled() and not dlg.coolm_enabled.isChecked()
+    dlg.coolm_dir.setText("/tmp/memo")                  # 폴더를 지정하면 켤 수 있음
+    assert dlg.coolm_enabled.isEnabled()
+    dlg.coolm_enabled.setChecked(True)
+    dlg.coolm_dir.setText("")                           # 지우면 자동으로 꺼짐
+    assert not dlg.coolm_enabled.isChecked() and not dlg.coolm_enabled.isEnabled()
+    from src.ui.main_window import _coolm_available
+    import src.ui.main_window as mw
+    monkeypatch.setattr(_pl, "system", lambda: "Darwin")
+    assert not _coolm_available(cfg.Config())
+    c2 = cfg.Config(); c2.coolm.memo_dir = "/tmp/memo"
+    assert _coolm_available(c2)
+    monkeypatch.setattr(_pl, "system", lambda: "Windows")
+    assert _coolm_available(cfg.Config())
+
+
 def test_settings_buttons_exist(app, tmp_path, monkeypatch):
     monkeypatch.setenv("CATMOA_CONFIG_DIR", str(tmp_path))
     create_fake_udb(tmp_path / "Memo", _msgs())

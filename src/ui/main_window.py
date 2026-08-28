@@ -62,6 +62,7 @@ class AppController:
 
         # 쿨메신저 폴링 (설정에서 켠 경우에만 동작)
         self.coolm = CoolmWatcher(self.config, parent=self.cat)
+        self.cat.coolm_available = _coolm_available(self.config)
         self.coolm.new_items.connect(self.on_items)
         self.coolm.error.connect(self._on_coolm_error)
         self.coolm.status.connect(lambda s: log.info("쿨메신저: %s", s))
@@ -226,6 +227,7 @@ class AppController:
     def _on_settings_saved(self, config: cfg.Config) -> None:
         self.config = config
         self.cat.config = config
+        self.cat.coolm_available = _coolm_available(config)
         self.coolm.apply_config(config)
         log.info("설정 저장: llm=%s/%s coolm=%s/%ss", config.llm.provider, config.llm.model,
                  config.coolm.enabled, config.coolm.poll_seconds)
@@ -310,6 +312,13 @@ class AppController:
 
     def show(self) -> None:
         self.cat.show()
+
+
+def _coolm_available(config: cfg.Config) -> bool:
+    """쿨메신저는 Windows 전용. 다른 OS 는 폴더를 직접 지정한 경우(테스트)만 메뉴에 노출."""
+    import platform
+
+    return platform.system() == "Windows" or bool(config.coolm.memo_dir.strip())
 
 
 def _no_items_message(item, ex) -> str:

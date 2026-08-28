@@ -421,6 +421,12 @@ class SettingsDialog(QDialog):
         self.coolm_enabled = QCheckBox("쿨메신저 새 쪽지를 자동으로 확인해 일정 분석 (Windows)")
         self.coolm_enabled.setChecked(s.enabled)
         lay.addWidget(self.coolm_enabled)
+        self._coolm_is_windows = platform.system() == "Windows"
+        if not self._coolm_is_windows:
+            note_os = QLabel("이 기능은 Windows의 쿨메신저용입니다. macOS/Linux에서는 아래에 udb 폴더를 직접 지정한 경우(테스트용)에만 켤 수 있습니다.")
+            note_os.setWordWrap(True)
+            note_os.setStyleSheet("color: palette(mid); font-size: 11px;")
+            lay.addWidget(note_os)
 
         box = QGroupBox()
         form = QFormLayout(box)
@@ -454,6 +460,17 @@ class SettingsDialog(QDialog):
         lay.addWidget(box)
         self.coolm_enabled.toggled.connect(box.setEnabled)
         box.setEnabled(s.enabled)
+        if not self._coolm_is_windows:
+            # Windows 가 아니면 폴더를 직접 지정했을 때만 '사용' 가능. 폴더 칸은 항상 편집 가능하게 상자 밖 상태와 무관하게 둔다.
+            def _sync_os(*_):
+                has_dir = bool(self.coolm_dir.text().strip())
+                self.coolm_enabled.setEnabled(has_dir)
+                if not has_dir and self.coolm_enabled.isChecked():
+                    self.coolm_enabled.setChecked(False)
+                box.setEnabled(True)   # 경로 입력은 허용
+            self.coolm_dir.textChanged.connect(_sync_os)
+            self.coolm_enabled.toggled.connect(lambda _: box.setEnabled(True))
+            _sync_os()
 
         # 연결 테스트 / 지금 확인 — 사용 여부와 무관하게 동작
         row2 = QHBoxLayout()

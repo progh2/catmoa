@@ -280,7 +280,8 @@ class CatWidget(QWidget):
         a_quit.triggered.connect(self.quit_requested.emit)
         menu.addAction(a_paste)
         menu.addAction(a_inbox)
-        menu.addAction(a_coolm)
+        if getattr(self, "coolm_available", True):
+            menu.addAction(a_coolm)
         menu.addSeparator()
         menu.addAction(a_settings)
         menu.addSeparator()
