@@ -125,6 +125,7 @@ Python 3.11 이상. 가상환경 생성과 의존성 설치는 스크립트가 �
 
 - 입력한 문서·이미지·쪽지 내용은 **선택한 LLM 공급자**로 전송됩니다. 외부 전송이 걱정되면 로컬 Ollama를 선택하세요.
 - 보내기 전에 **개인정보 마스킹**(기본 켜짐)이 이름·전화·이메일·주민번호·주소·학번 등을 PC 안에서 토큰으로 바꿉니다. 설정 → **개인정보** 탭에서 끄거나 **가려보기**로 확인할 수 있습니다. 이미지 속 글자는 가릴 수 없습니다.
+  - 규칙 기반 마스킹이 내장돼 있고, 문맥형 인명까지 잡으려면 [schift-ko-pii-v6](https://huggingface.co/schift-io/schift-ko-pii-v6) 모델을 함께 쓸 수 있습니다 (선택). 설정 폴더의 `pii_model/` 에 모델 파일을 두고 `pip install schift-ko-pii` 하면 자동으로 인식합니다 (환경변수 `CATMOA_PII_MODEL` 로 경로 지정 가능). **모델은 로컬에서만 돌고 네트워크를 쓰지 않습니다.**
 - 쿨메신저 DB는 **읽기 전용 복사본**으로만 접근하며 원본을 수정하지 않습니다.
 - Google 토큰과 API 키는 OS 키체인(macOS Keychain / Windows Credential Manager / Linux Secret Service)에 저장됩니다.
 - 별도 서버 없음. 데이터는 사용자 PC ↔ LLM ↔ Google 사이에서만 오갑니다. 업데이트 확인만 GitHub에 요청합니다.
@@ -172,6 +173,7 @@ catmoa/
 
 ## 감사
 
+- 개인정보 마스킹에 쓰는 내장 AI 모델: [schift-io/schift-ko-pii-v6](https://huggingface.co/schift-io/schift-ko-pii-v6) — 한국어 개인정보 탐지 모델. 규칙만으로는 잡기 어려운 문맥형 인명 등을 찾아냅니다. 모델은 **사용자 PC 안에서만** 동작하며 외부로 데이터를 보내지 않습니다.
 - 쿨메신저 `.udb` 읽기 방식은 [dacisosl/coolm-helper](https://github.com/dacisosl/coolm-helper) (MIT)를 참고했습니다.
 
 ## 라이선스
