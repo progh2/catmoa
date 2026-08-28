@@ -189,6 +189,8 @@ class ScheduleItem(BaseModel):   # LLM 출력 단위
 | D9 | 쿨메신저 접근 = 복사본 읽기 전용 | 원본 직접 열기 | coolm-helper 검증 방식. 원본 무손상 보장 |
 | D10 | 패키지명 `pipeline`, `gsync` | `queue`, `google` | stdlib·google 네임스페이스 충돌 회피 |
 | D11 | Python 3.12 빌드 | 3.13 | 3-OS wheel 가용성이 가장 안정적 |
+| D12 | 자동 업데이트 = GitHub Releases 조회 + 외부 교체 스크립트 | 인스톨러/서명 프레임워크 | 서버 없이 동작. 실행 중 바이너리는 자기 교체 불가 → 종료 대기 스크립트가 폴더 교체·재실행. frozen 에서만 설치 |
+| D13 | Upstage 이미지 입력은 Document Parse OCR 경유 | 비전 미지원으로 이미지 거부 | Solar 채팅은 이미지 불가. 한국어 OCR 품질이 좋아 공문 스캔에 오히려 유리 |
 
 ## 6. 개인정보
 
