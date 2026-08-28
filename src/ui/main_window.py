@@ -5,7 +5,7 @@ import logging
 from collections import deque
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
+from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon, QWidget
 
 from src import config as cfg
 from src import updater
@@ -22,6 +22,7 @@ from src.ui.cat_widget import CatWidget
 from src.ui.review_dialog import Decision, ReviewDialog
 from src.ui.settings_dialog import SettingsDialog, _Task
 from src.ui.toast import Toast
+from src.ui.tray import CatTray
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +42,16 @@ class AppController:
         self.cat.update_requested.connect(lambda: self.open_settings(tab="update"))
         self.cat.inbox_requested.connect(self.import_inbox)
         self.cat.coolm_requested.connect(self.coolm_check_now)
+        self.cat.hide_requested.connect(lambda: self.set_cat_hidden(True))
         self._update_info = None
+
+        # 시스템 트레이: 항상 표시, 숨김/보이기 토글
+        self.tray = CatTray()
+        self.tray.toggle_requested.connect(lambda: self.set_cat_hidden(not self.tray.hidden))
+        self.tray.settings_requested.connect(self.open_settings)
+        self.tray.quit_requested.connect(self.quit)
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray.show()
         self.cat.quit_requested.connect(self.quit)
 
         self.tasklists: list[tuple[str, str]] = []   # Google Tasks 목록 (id, 이름) — 카테고리로 사용
@@ -205,6 +215,18 @@ class AppController:
         t.start()
 
     # ------------------------------------------------------------ 기타
+    def set_cat_hidden(self, hidden: bool) -> None:
+        """고양이를 트레이로 숨기거나 다시 보인다. 처리(큐·쿨메신저 폴링)는 계속 돈다."""
+        self.tray.set_hidden(hidden)
+        if hidden:
+            self.cat.hide()
+            self.tray.showMessage("catmoa", "고양이가 트레이로 들어갔어요. 아이콘을 클릭하면 다시 나와요.",
+                                  QSystemTrayIcon.MessageIcon.NoIcon, 2500)
+        else:
+            self.cat.show()
+            self.cat.raise_()
+        log.info("고양이 %s", "숨김" if hidden else "표시")
+
     def open_settings(self, tab: str | None = None) -> None:
         dlg = SettingsDialog(self.config, google_auth=self.google, parent=None,
                              initial_tab=tab, update_info=self._update_info, quit_callback=self.quit,
@@ -230,6 +252,7 @@ class AppController:
         self.config = config
         self.cat.config = config
         self.cat.coolm_available = _coolm_available(config)
+        self.cat.set_scale(config.ui.cat_scale)
         self.coolm.apply_config(config)
         log.info("설정 저장: llm=%s/%s coolm=%s/%ss", config.llm.provider, config.llm.model,
                  config.coolm.enabled, config.coolm.poll_seconds)

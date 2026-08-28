@@ -50,9 +50,13 @@ def make(size: int = 1024) -> Image.Image:
     return im
 
 
-def make_from_cat(size: int = 1024) -> Image.Image | None:
-    """사용자 고양이 이미지(기본 고양이)로 아이콘 생성: 크림색 둥근 사각형 위에 고양이."""
-    src = next((p for p in [ROOT / "assets" / "cat-src" / "기본 고양이.png", ROOT / "assets" / "cat" / "idle_1.png"] if p.exists()), None)
+def make_from_cat(size: int = 1024, variant: str = "idle") -> Image.Image | None:
+    """사용자 고양이 이미지로 아이콘 생성: 크림색 둥근 사각형 위에 고양이. variant='sleeping' 이면 눈 감은 고양이(트레이 숨김용)."""
+    cands = {
+        "idle": [ROOT / "assets" / "cat-src" / "기본 고양이.png", ROOT / "assets" / "cat" / "idle_1.png"],
+        "sleeping": [ROOT / "assets" / "cat-src" / "눈 감는 고양이.png", ROOT / "assets" / "cat" / "sleeping.png"],
+    }[variant]
+    src = next((p for p in cands if p.exists()), None)
     if src is None:
         return None
     cat = Image.open(src).convert("RGBA")
@@ -79,6 +83,9 @@ def main() -> None:
     im = make_from_cat() or make()
     im.save(OUT / "icon.png")
     im.save(OUT / "icon.ico", sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])
+    sleeping = make_from_cat(variant="sleeping")
+    if sleeping is not None:
+        sleeping.resize((256, 256), Image.LANCZOS).save(OUT / "icon_sleeping.png")   # 트레이(숨김 상태)용
     docs_icon = ROOT / "docs" / "icon.png"
     if docs_icon.parent.exists():
         im.resize((512, 512), Image.LANCZOS).save(docs_icon)   # 랜딩 페이지 로고/og:image

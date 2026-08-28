@@ -129,6 +129,7 @@ class CoolmSettings:
 class UISettings:
     widget_x: int = -1                  # -1 = 화면 우하단 기본 위치
     widget_y: int = -1
+    cat_scale: float = 1.0              # 고양이 크기 배율 0.5 ~ 3.0
 
 
 @dataclass

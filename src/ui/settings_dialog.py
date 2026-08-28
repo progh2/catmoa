@@ -11,8 +11,8 @@ from PySide6.QtCore import Qt, QThread, QTime, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QTabWidget,
-    QTimeEdit, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSlider, QSpinBox,
+    QTabWidget, QTimeEdit, QVBoxLayout, QWidget,
 )
 
 from src import autostart
@@ -285,6 +285,26 @@ class SettingsDialog(QDialog):
         self.source_chars.setValue(s.source_text_chars)
         self.source_chars.setToolTip("캘린더 설명과 태스크 메모 하단에 '─── 원문 ───'으로 입력 원문을 넣어 나중에 구체 내용을 확인할 수 있게 합니다")
         form.addRow("원문 포함 길이", self.source_chars)
+
+        srow = QHBoxLayout()
+        self.cat_scale = QSlider(Qt.Orientation.Horizontal)
+        self.cat_scale.setRange(5, 30)                     # 0.5× ~ 3.0× (×0.1)
+        self.cat_scale.setSingleStep(1)
+        self.cat_scale.setPageStep(5)
+        self.cat_scale.setTickInterval(5)
+        self.cat_scale.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.cat_scale.setValue(int(round(max(0.5, min(3.0, self.config.ui.cat_scale)) * 10)))
+        self.cat_scale_label = QLabel()
+        self.cat_scale_label.setMinimumWidth(44)
+        self.cat_scale.valueChanged.connect(lambda v: self.cat_scale_label.setText(f"{v / 10:.1f}×"))
+        self.cat_scale_label.setText(f"{self.cat_scale.value() / 10:.1f}×")
+        b_reset = QPushButton("1.0×")
+        b_reset.setToolTip("기본 크기로")
+        b_reset.clicked.connect(lambda: self.cat_scale.setValue(10))
+        srow.addWidget(self.cat_scale, 1)
+        srow.addWidget(self.cat_scale_label)
+        srow.addWidget(b_reset)
+        form.addRow("고양이 크기", srow)
 
         self.autostart = QCheckBox("운영체제 시작(로그인) 시 catmoa 자동 실행")
         try:
@@ -785,6 +805,7 @@ class SettingsDialog(QDialog):
             s.tasklist_id = self.tasklist.currentData() or ""
 
         c.teacher = self._tt_collect()
+        c.ui.cat_scale = self.cat_scale.value() / 10
 
         cm = c.coolm
         cm.enabled = self.coolm_enabled.isChecked()

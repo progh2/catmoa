@@ -58,7 +58,7 @@ class CatImageSet:
         return self.frames.get("idle") or []
 
 
-def load_cat_images(directory: Path | None = None, dpr: float = 2.0) -> CatImageSet | None:
+def load_cat_images(directory: Path | None = None, dpr: float = 2.0, scale: float = 1.0) -> CatImageSet | None:
     """폴더의 PNG 를 상태별 프레임으로 묶어 로드. idle 이 없으면 None."""
     d = directory or find_cat_dir()
     if d is None:
@@ -78,7 +78,8 @@ def load_cat_images(directory: Path | None = None, dpr: float = 2.0) -> CatImage
     first = QPixmap(str(sorted(grouped["idle"])[0][1]))
     if first.isNull():
         return None
-    lw = min(int(first.width() * DISPLAY_SCALE), MAX_LOGICAL_WIDTH)
+    scale = max(0.5, min(3.0, float(scale or 1.0)))
+    lw = max(24, min(int(first.width() * DISPLAY_SCALE * scale), int(MAX_LOGICAL_WIDTH * scale)))
     lh = max(1, int(first.height() * lw / max(first.width(), 1)))
     out = CatImageSet(logical_size=(lw, lh), source_dir=d)
     for state, items in grouped.items():

@@ -40,30 +40,38 @@ class HairpinBadge(QWidget):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self.setFixedSize(44, 30)
+        self._s = 1.0
+        self.set_scale(1.0)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+    def set_scale(self, scale: float) -> None:
+        """고양이 배율에 맞춰 핀 크기도 조절 (0.7~2.2 배 범위로 완만하게)."""
+        self._s = max(0.7, min(2.2, 0.55 + 0.45 * scale))
+        self.setFixedSize(int(44 * self._s), int(30 * self._s))
+        self.update()
 
     def paintEvent(self, e) -> None:
         from PySide6.QtCore import QRectF
         from PySide6.QtGui import QColor, QPainter, QPen
 
+        s = self._s
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         p.translate(self.width() / 2, self.height() / 2)
         p.rotate(self.ANGLE)
-        w, h = 34, 16
+        w, h = 34 * s, 16 * s
         rect = QRectF(-w / 2, -h / 2, w, h)
-        p.setPen(QPen(QColor(150, 20, 30), 1.5))
+        p.setPen(QPen(QColor(150, 20, 30), 1.5 * s))
         p.setBrush(QColor(226, 48, 58))
         p.drawRoundedRect(rect, h / 2, h / 2)
         # 핀 광택
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor(255, 255, 255, 70))
-        p.drawRoundedRect(QRectF(-w / 2 + 3, -h / 2 + 2, w - 6, h / 2 - 2), 4, 4)
+        p.drawRoundedRect(QRectF(-w / 2 + 3 * s, -h / 2 + 2 * s, w - 6 * s, h / 2 - 2 * s), 4 * s, 4 * s)
         f = p.font()
-        f.setPixelSize(12)
+        f.setPixelSize(max(8, int(12 * s)))
         f.setBold(True)
         p.setFont(f)
         p.setPen(QColor("white"))
@@ -83,6 +91,7 @@ class CatWidget(QWidget):
     update_requested = Signal()          # ⬆ 배지 클릭 → 설정의 업데이트 탭
     inbox_requested = Signal()
     coolm_requested = Signal()           # 쿨메신저 지금 확인
+    hide_requested = Signal()            # 트레이로 숨기기
     quit_requested = Signal()
 
     def __init__(self, config: cfg.Config, parent: QWidget | None = None):
@@ -93,6 +102,7 @@ class CatWidget(QWidget):
         self._drag_offset: QPoint | None = None
         self._queue_size = 0
         self._busy = False
+        self._scale = max(0.5, min(3.0, float(getattr(config.ui, "cat_scale", 1.0) or 1.0)))
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -112,6 +122,7 @@ class CatWidget(QWidget):
         self.badge.hide()
         # 업데이트 배지: 고양이 머리에 꽂은 머리핀처럼 (레이아웃 밖 오버레이, 기울어진 빨간 핀)
         self.update_badge = HairpinBadge(self)
+        self.update_badge.set_scale(self._scale)
         self.update_badge.clicked.connect(self.update_requested.emit)
         self.update_badge.hide()
         # 숨겨져 있어도 자리를 차지하게 → 배지 표시 때 창 크기가 변하지 않는다
@@ -126,8 +137,7 @@ class CatWidget(QWidget):
         self.face.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face.setProperty("state", "idle")
         # 이미지 고양이: assets/cat 또는 사용자 폴더에 PNG 가 있으면 이미지 모드, 없으면 텍스트 모드
-        screen = QGuiApplication.primaryScreen()
-        self._images = load_cat_images(dpr=screen.devicePixelRatio() if screen else 2.0)
+        self._images = self._load_images()
         self.face.setProperty("mode", "image" if self._images else "text")
         self._fix_face_size()
 
@@ -141,10 +151,8 @@ class CatWidget(QWidget):
         self.badge.setFixedHeight(top_h)
         self.badge.setText("")
         # face 는 _fix_face_size 에서 setFixedSize 됨 → 레이아웃 전이라도 minimumWidth/Height 가 확정값
-        fw, fh = self.face.minimumWidth(), self.face.minimumHeight()
-        self.setFixedSize(fw, top_h + fh)
         self._top_h = top_h
-        self._place_update_badge()
+        self._lock_size()
 
         # ---- 타이머
         self._anim = QTimer(self)
@@ -257,6 +265,37 @@ class CatWidget(QWidget):
     def image_mode(self) -> bool:
         return self._images is not None
 
+    @property
+    def scale(self) -> float:
+        return self._scale
+
+    def _load_images(self):
+        screen = QGuiApplication.primaryScreen()
+        return load_cat_images(dpr=screen.devicePixelRatio() if screen else 2.0, scale=self._scale)
+
+    def _lock_size(self) -> None:
+        """face 고정 크기(+배지 줄)로 창을 잠그고 머리핀 위치를 다시 잡는다."""
+        fw, fh = self.face.minimumWidth(), self.face.minimumHeight()
+        self.setFixedSize(fw, self._top_h + fh)
+        self._place_update_badge()
+
+    def set_scale(self, scale: float) -> None:
+        """고양이 크기 배율 변경 (0.5~3.0). 이미지 재로딩 → 크기 재계산 → 현재 표정 다시 그림."""
+        scale = max(0.5, min(3.0, float(scale or 1.0)))
+        if abs(scale - self._scale) < 1e-6:
+            return
+        self._scale = scale
+        self._images = self._load_images()
+        self.update_badge.set_scale(scale)
+        self.face.setProperty("mode", "image" if self._images else "text")
+        self.face.setMinimumSize(0, 0)
+        self.face.setMaximumSize(16777215, 16777215)
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(16777215, 16777215)
+        self._fix_face_size()
+        self._lock_size()
+        self._paint()
+
     def _frame_count(self) -> int:
         if self._images:
             return max(1, len(self._images.frames_for(self._state)))
@@ -284,7 +323,7 @@ class CatWidget(QWidget):
         # 폰트를 코드에서 지정해야 QSS 적용 전에도 정확히 측정된다 (QSS 폰트는 show 이후에나 반영됨)
         font = QFont()
         font.setFamilies([f.strip() for f in MONO_FAMILY.split(",")])
-        font.setPixelSize(FACE_FONT_PX)
+        font.setPixelSize(max(8, int(FACE_FONT_PX * self._scale)))
         self.face.setFont(font)
         fm = QFontMetrics(font)
         frames = [f for fs in CAT_FACES.values() for f in fs]
@@ -350,6 +389,8 @@ class CatWidget(QWidget):
         a_coolm.triggered.connect(self.coolm_requested.emit)
         a_settings = QAction("설정…", self)
         a_settings.triggered.connect(self.settings_requested.emit)
+        a_hide = QAction("숨기기 (트레이 아이콘 클릭으로 복귀)", self)
+        a_hide.triggered.connect(self.hide_requested.emit)
         a_quit = QAction("종료", self)
         a_quit.triggered.connect(self.quit_requested.emit)
         menu.addAction(a_paste)
@@ -359,6 +400,7 @@ class CatWidget(QWidget):
         menu.addSeparator()
         menu.addAction(a_settings)
         menu.addSeparator()
+        menu.addAction(a_hide)
         menu.addAction(a_quit)
         menu.exec(e.globalPos())
 

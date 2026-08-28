@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT))
 from src import __version__  # noqa: E402
 
 datas = [(str(ROOT / "assets" / "icon.png"), "assets")]
+datas += [(str(p), "assets") for p in [ROOT / "assets" / "icon_sleeping.png"] if p.exists()]   # 트레이 숨김 아이콘
 datas += [(str(p), "assets/cat") for p in (ROOT / "assets" / "cat").glob("*.png")]   # 이미지 고양이 (있으면)
 datas += collect_data_files("googleapiclient", includes=["discovery_cache/documents/*.json"])
 datas += collect_data_files("pdfminer")          # cmap 등
