@@ -12,7 +12,8 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.2 검토·분류 개선 완료 (#25 위젯 크기 고정, #26 📅+✅ 동시 등록, #27 사용자 분류 규칙·태스크 카테고리) — 태그 미발행 (v1.2.0 릴리스 대기)
+- intent: v1.3.0 — 쿨메신저 연결 테스트/지금 확인 버튼(#28). 사용자가 Windows(Parallels)에서 실제 쿨메신저로 테스트 중
+- (이전) v1.2.0 릴리스 완료 (#25 위젯 크기 고정, #26 📅+✅ 동시 등록, #27 사용자 분류 규칙·태스크 카테고리)
 - v1.2 메모: Decision.targets 집합(review_dialog), Registrar 조합 처리, ScheduleSettings.kind_rules/category_rules, ScheduleItem.category, PipelineWorker(options_factory), AppController.tasklists 캐시. 테스트 119개. 로컬 build.py 실행 시 src/_secrets.py 가 생겨 테스트가 실제 ID를 읽음 → 테스트에서 sys.modules["src._secrets"]=None 격리
 - (이전) v1.1.0 릴리스 완료 (Gemini/Upstage 공급자 #23, 자동 업데이트 #24)
 - changes_made: llm/gemini.py·upstage.py, updater.py(릴리스 확인·다운로드·교체 스크립트), 설정 '업데이트' 탭, 고양이 ⬆ 배지, CI 태그-버전 가드. 테스트 108개. **업데이트 E2E 검증**: 1.0.0 frozen 앱 → v1.1.0 릴리스로 자기 교체·재실행 성공(macOS). Google 실검증 완료(v1.0.0 때)
