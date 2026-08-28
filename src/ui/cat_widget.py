@@ -18,6 +18,7 @@ from PySide6.QtWidgets import QApplication, QHBoxLayout, QLabel, QMenu, QVBoxLay
 from src import config as cfg
 from src.parsers import is_supported
 from src.pipeline.items import InputItem
+from src.ui.cat_faces import load_cat_images
 from src.ui.styles import CAT_FACES, FRAME_MS, MONO_FAMILY, STATE_TIPS, WIDGET_QSS
 
 FACE_FONT_PX = 20
@@ -79,6 +80,10 @@ class CatWidget(QWidget):
         self.face = QLabel(objectName="catFace")
         self.face.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face.setProperty("state", "idle")
+        # 이미지 고양이: assets/cat 또는 사용자 폴더에 PNG 가 있으면 이미지 모드, 없으면 텍스트 모드
+        screen = QGuiApplication.primaryScreen()
+        self._images = load_cat_images(dpr=screen.devicePixelRatio() if screen else 2.0)
+        self.face.setProperty("mode", "image" if self._images else "text")
         self._fix_face_size()
 
         root = QVBoxLayout(self)
@@ -174,17 +179,34 @@ class CatWidget(QWidget):
         else:
             self._enter("idle")
 
+    @property
+    def image_mode(self) -> bool:
+        return self._images is not None
+
+    def _frame_count(self) -> int:
+        if self._images:
+            return max(1, len(self._images.frames_for(self._state)))
+        return len(CAT_FACES.get(self._state, ["(=^･ω･^=)"]))
+
     def _tick(self) -> None:
-        frames = CAT_FACES.get(self._state, ["(=^･ω･^=)"])
-        self._frame = (self._frame + 1) % len(frames)
+        self._frame = (self._frame + 1) % self._frame_count()
         self._paint()
 
     def _paint(self) -> None:
+        if self._images:
+            frames = self._images.frames_for(self._state)
+            if frames:
+                self.face.setPixmap(frames[self._frame % len(frames)])
+            return
         frames = CAT_FACES.get(self._state, ["(=^･ω･^=)"])
         self.face.setText(frames[self._frame % len(frames)])
 
     def _fix_face_size(self) -> None:
         """모든 표정 프레임 중 가장 넓은/높은 것에 맞춰 크기를 고정 → 상태가 바뀌어도 창 크기 불변."""
+        if self._images:
+            w, h = self._images.logical_size
+            self.face.setFixedSize(w, h)
+            return
         # 폰트를 코드에서 지정해야 QSS 적용 전에도 정확히 측정된다 (QSS 폰트는 show 이후에나 반영됨)
         font = QFont()
         font.setFamilies([f.strip() for f in MONO_FAMILY.split(",")])

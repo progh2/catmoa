@@ -39,6 +39,7 @@ QLabel#catFace {{
     border-radius: 18px;
     padding: 10px 16px;
 }}
+QLabel#catFace[mode="image"] {{ background: transparent; border: none; padding: 0; }}
 QLabel#catFace[state="drag"] {{ border-color: #6fbf73; background: rgba(240, 255, 240, 245); }}
 QLabel#catFace[state="eating"], QLabel#catFace[state="thinking"] {{ border-color: #f2a65a; }}
 QLabel#catFace[state="happy"] {{ border-color: #6fbf73; }}
