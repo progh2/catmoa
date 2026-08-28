@@ -76,6 +76,7 @@ class CatWidget(QWidget):
         self.face = QLabel(objectName="catFace")
         self.face.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face.setProperty("state", "idle")
+        self._fix_face_size()
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -170,7 +171,16 @@ class CatWidget(QWidget):
     def _paint(self) -> None:
         frames = CAT_FACES.get(self._state, ["(=^･ω･^=)"])
         self.face.setText(frames[self._frame % len(frames)])
-        self.adjustSize()
+
+    def _fix_face_size(self) -> None:
+        """모든 표정 프레임 중 가장 넓은/높은 것에 맞춰 크기를 고정 → 상태가 바뀌어도 창 크기 불변."""
+        self.face.ensurePolished()
+        fm = self.face.fontMetrics()
+        frames = [f for fs in CAT_FACES.values() for f in fs]
+        w = max(fm.horizontalAdvance(f) for f in frames)
+        h = fm.height()
+        # QSS: padding 10px 16px + border 2px, 이모지 폭 여유
+        self.face.setFixedSize(w + 16 * 2 + 2 * 2 + 12, h + 10 * 2 + 2 * 2)
 
     # ------------------------------------------------------------ 마우스 / 이동
     def enterEvent(self, event) -> None:
