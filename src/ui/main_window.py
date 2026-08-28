@@ -36,6 +36,7 @@ class AppController:
         self.cat.settings_requested.connect(self.open_settings)
         self.cat.update_requested.connect(lambda: self.open_settings(tab="update"))
         self.cat.inbox_requested.connect(self.import_inbox)
+        self.cat.coolm_requested.connect(self.coolm_check_now)
         self._update_info = None
         self.cat.quit_requested.connect(self.quit)
 
@@ -166,7 +167,7 @@ class AppController:
     def open_settings(self, tab: str | None = None) -> None:
         dlg = SettingsDialog(self.config, google_auth=self.google, parent=None,
                              initial_tab=tab, update_info=self._update_info, quit_callback=self.quit,
-                             tasklists=self.tasklists)
+                             tasklists=self.tasklists, coolm_watcher=self.coolm)
         dlg.saved.connect(self._on_settings_saved)
         dlg.exec()
         self.refresh_tasklists()   # 로그인/목록 변경 반영
@@ -193,6 +194,19 @@ class AppController:
     def _on_coolm_error(self, msg: str) -> None:
         self.cat.show_error(f"쿨메신저: {msg}")
         log.warning("쿨메신저 오류: %s", msg)
+
+    def coolm_check_now(self) -> None:
+        """우클릭 메뉴 → 쿨메신저 새 쪽지 강제 확인."""
+        self.cat.set_busy(True, "thinking")
+        self.cat.face.setToolTip("쿨메신저 새 쪽지 확인 중…")
+
+        def done(msgs):
+            n = self.coolm.deliver(msgs)
+            if not n:
+                self.cat.set_busy(False)
+                self.cat.face.setToolTip("쿨메신저: 새 쪽지가 없습니다.")
+
+        self._run_bg(self.coolm.fetch_now, done, lambda m: self.cat.show_error(f"쿨메신저: {m}"))
 
     def import_inbox(self) -> None:
         if not self.google.is_logged_in():

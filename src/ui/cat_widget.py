@@ -33,6 +33,7 @@ class CatWidget(QWidget):
     settings_requested = Signal()
     update_requested = Signal()          # ⬆ 배지 클릭 → 설정의 업데이트 탭
     inbox_requested = Signal()
+    coolm_requested = Signal()           # 쿨메신저 지금 확인
     quit_requested = Signal()
 
     def __init__(self, config: cfg.Config, parent: QWidget | None = None):
@@ -222,12 +223,15 @@ class CatWidget(QWidget):
         a_paste.triggered.connect(self.paste_from_clipboard)
         a_inbox = QAction("Google Tasks 인박스 가져오기", self)
         a_inbox.triggered.connect(self.inbox_requested.emit)
+        a_coolm = QAction("쿨메신저 지금 확인", self)
+        a_coolm.triggered.connect(self.coolm_requested.emit)
         a_settings = QAction("설정…", self)
         a_settings.triggered.connect(self.settings_requested.emit)
         a_quit = QAction("종료", self)
         a_quit.triggered.connect(self.quit_requested.emit)
         menu.addAction(a_paste)
         menu.addAction(a_inbox)
+        menu.addAction(a_coolm)
         menu.addSeparator()
         menu.addAction(a_settings)
         menu.addSeparator()

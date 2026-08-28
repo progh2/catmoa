@@ -78,10 +78,11 @@ class SettingsDialog(QDialog):
 
     def __init__(self, config: cfg.Config, google_auth: GoogleAuthLike | None = None, parent: QWidget | None = None,
                  *, initial_tab: str | None = None, update_info=None, quit_callback: Callable[[], None] | None = None,
-                 tasklists: list[tuple[str, str]] | None = None):
+                 tasklists: list[tuple[str, str]] | None = None, coolm_watcher=None):
         super().__init__(parent)
         self.config = config
         self.google = google_auth
+        self.coolm = coolm_watcher
         self._tasklists = list(tasklists or [])
         self._tasks: list[_Task] = []
         self._update_info = update_info
@@ -438,6 +439,21 @@ class SettingsDialog(QDialog):
         self.coolm_enabled.toggled.connect(box.setEnabled)
         box.setEnabled(s.enabled)
 
+        # 연결 테스트 / 지금 확인 — 사용 여부와 무관하게 동작
+        row2 = QHBoxLayout()
+        self.btn_coolm_test = QPushButton("연결 테스트")
+        self.btn_coolm_test.clicked.connect(self._coolm_test)
+        self.btn_coolm_now = QPushButton("지금 확인 (새 쪽지 처리)")
+        self.btn_coolm_now.clicked.connect(self._coolm_check_now)
+        self.btn_coolm_now.setEnabled(self.coolm is not None)
+        self.coolm_result = QLabel("")
+        self.coolm_result.setWordWrap(True)
+        row2.addWidget(self.btn_coolm_test)
+        row2.addWidget(self.btn_coolm_now)
+        row2.addStretch(1)
+        lay.addLayout(row2)
+        lay.addWidget(self.coolm_result)
+
         note = QLabel("쪽지 DB는 읽기 전용 복사본으로만 접근하며 원본은 수정하지 않습니다. "
                       "다만 쪽지 <b>본문이 LLM으로 전송</b>됩니다 — 외부 전송이 걱정되면 LLM 탭에서 Ollama(로컬)를 선택하세요.")
         note.setWordWrap(True)
@@ -445,6 +461,37 @@ class SettingsDialog(QDialog):
         lay.addWidget(note)
         lay.addStretch(1)
         return w
+
+    def _coolm_dir_value(self) -> str:
+        return self.coolm_dir.text().strip() or default_coolm_dir()
+
+    def _coolm_test(self):
+        from src.sources.coolm_watcher import check_connection
+
+        d = self._coolm_dir_value()
+        if not d:
+            self.coolm_result.setText("❌ 메시지 폴더를 지정하세요 (Windows 가 아니면 자동 탐지가 되지 않습니다).")
+            return
+        self.btn_coolm_test.setEnabled(False)
+        self.coolm_result.setText("확인 중…")
+        self._run(lambda: check_connection(d),
+                  lambda msg: (self.coolm_result.setText(msg), self.btn_coolm_test.setEnabled(True)),
+                  lambda m: (self.coolm_result.setText(f"❌ {m}"), self.btn_coolm_test.setEnabled(True)))
+
+    def _coolm_check_now(self):
+        if self.coolm is None:
+            return
+        d = self._coolm_dir_value()
+        self.btn_coolm_now.setEnabled(False)
+        self.coolm_result.setText("새 쪽지 확인 중…")
+
+        def done(msgs):
+            n = self.coolm.deliver(msgs)      # 메인 스레드에서 큐 투입
+            self.coolm_result.setText(f"✅ 새 쪽지 {n}건을 처리 큐에 넣었습니다." if n else "새 쪽지가 없습니다.")
+            self.btn_coolm_now.setEnabled(True)
+
+        self._run(lambda: self.coolm.fetch_now(d), done,
+                  lambda m: (self.coolm_result.setText(f"❌ {m}"), self.btn_coolm_now.setEnabled(True)))
 
     def _browse_coolm(self):
         d = QFileDialog.getExistingDirectory(self, "쿨메신저 Memo 폴더", self.coolm_dir.text() or default_coolm_dir())

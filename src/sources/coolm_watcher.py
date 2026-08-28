@@ -14,6 +14,18 @@ log = logging.getLogger(__name__)
 MAX_PER_POLL = 20
 
 
+def check_connection(memo_dir: str) -> str:
+    """DB 를 열어 상태를 한 줄로 요약한다. 실패 시 CoolmError."""
+    with CoolmReader(memo_dir) as r:
+        latest = r.latest_messages(limit=1)
+        total = r.latest_key()
+        if latest:
+            m = latest[0]
+            return (f"✅ 연결 OK — 쪽지 키 최대 {total}, 최근: {m.received:%Y-%m-%d %H:%M} {m.sender or '?'}"
+                    + (f" 「{m.title[:20]}」" if m.title.strip() else ""))
+        return f"✅ 연결 OK — 받은 쪽지가 없습니다 (키 최대 {total})"
+
+
 def message_to_item(m: Message) -> InputItem:
     return InputItem(
         kind="coolm",
@@ -88,6 +100,33 @@ class CoolmWatcher(QObject):
         log.info("쿨메신저 새 쪽지 %d건 (키 %d 까지)", len(items), c.last_message_key)
         if items:
             self.new_items.emit(items)
+
+    # ---- 강제 조회 (설정 버튼 / 우클릭 메뉴). DB 읽기(fetch_now)는 어느 스레드에서든, deliver 는 메인 스레드에서.
+    FORCE_INITIAL_LIMIT = 5
+
+    def fetch_now(self, memo_dir: str | None = None) -> list[Message]:
+        """사용 여부와 무관하게 새 쪽지를 읽는다. 아직 한 번도 처리한 적 없으면(키 0) 최근 안읽은 쪽지 최대 5건."""
+        c = self.config.coolm
+        with CoolmReader(memo_dir or self.memo_dir()) as r:
+            if c.last_message_key == 0:
+                latest = r.latest_messages(limit=20)
+                unread = [m for m in latest if m.is_unread][: self.FORCE_INITIAL_LIMIT]
+                msgs = unread or latest[:1]
+                return sorted(msgs, key=lambda m: m.key)
+            return r.messages_after(c.last_message_key, limit=MAX_PER_POLL)
+
+    def deliver(self, msgs: list[Message]) -> int:
+        """읽어온 쪽지를 큐에 넣고 마지막 키를 저장. 반환: 투입 건수."""
+        if not msgs:
+            return 0
+        self._first_run = False
+        c = self.config.coolm
+        c.last_message_key = max(c.last_message_key, max(m.key for m in msgs))
+        self._persist()
+        items = [message_to_item(m) for m in msgs if m.body.strip() or m.title.strip()]
+        if items:
+            self.new_items.emit(items)
+        return len(items)
 
     def _persist(self) -> None:
         try:
