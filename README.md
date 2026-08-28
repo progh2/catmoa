@@ -1,14 +1,18 @@
-# catmoa 🐱 — 교사를 위한 일정 수집 고양이
+<p align="center"><img src="assets/icon.png" width="160" alt="catmoa 아이콘"></p>
 
-학교 곳곳에 흩어진 일정·할 일(한글 문서, PDF, 쿨메신저 쪽지, 스크린샷, 복사한 텍스트, 휴대폰 메모)을
-**고양이에게 던져주면** AI가 뽑아내고, 확인 한 번으로 **Google 캘린더 / Google Tasks**에 넣어주는
-데스크톱 프로그램입니다. macOS · Windows · Linux를 지원합니다.
+<h1 align="center">catmoa — 교사를 위한 일정 수집 고양이</h1>
+
+<p align="center">
+학교 곳곳에 흩어진 일정·할 일(한글 문서, PDF, 쿨메신저 쪽지, 스크린샷, 복사한 텍스트, 휴대폰 메모)을<br>
+<b>고양이에게 던져주면</b> AI가 뽑아내고, 확인 한 번으로 <b>Google 캘린더 / Google Tasks</b>에 넣어주는 데스크톱 프로그램입니다.<br>
+macOS · Windows · Linux
+</p>
+
+<p align="center">🏠 <b>소개·다운로드 페이지</b>: <a href="https://progh2.github.io/catmoa/">progh2.github.io/catmoa</a> · <a href="https://github.com/progh2/catmoa/releases/latest">최신 릴리스</a></p>
 
 > 교사 해커톤 프로젝트. 목표는 "사용자 개입 최소화"입니다.
 
-🏠 **소개·다운로드 페이지**: https://progh2.github.io/catmoa/
-
-<p align="center"><img src="assets/cat/idle_1.png" width="120" alt="catmoa"> <img src="assets/cat/searching.png" width="120" alt="서류 찾는 중"> <img src="assets/cat/eating_1.png" width="120" alt="분석 중"> <img src="assets/cat/happy.png" width="120" alt="완료"></p>
+<p align="center"><img src="assets/cat/idle_1.png" width="88" alt="대기"> <img src="assets/cat/hover_tr.png" width="88" alt="마우스 쳐다봄"> <img src="assets/cat/searching.png" width="88" alt="서류 찾는 중"> <img src="assets/cat/eating_1.png" width="88" alt="분석 중"> <img src="assets/cat/happy.png" width="88" alt="완료"> <img src="assets/cat/bored.png" width="88" alt="심심"></p>
 
 ## 한눈에 보는 흐름
 
