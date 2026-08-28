@@ -12,7 +12,8 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.4.6 태그(CI 진행) — 4방향 호버 시선(hover_tl/tr/bl/br, 사용자 이미지 4장 → cat-src, prepare_cat OPTIONAL 매핑), 파비콘(favicon.ico/apple-touch-icon, ?v=3), 랜딩 시선 추적. **규칙: 사용자 요청은 먼저 이슈 등록 후 커밋에 closes #N** (#33~#40 소급 등록, 마일스톤 v1.5 표정·편의)
+- intent: v1.4.8 — 캘린더 설명·태스크 메모 하단에 원문(ScheduleItem.source_text, 설정 source_text_chars 기본 1500, 0=끔) (#42). v1.4.7: 설정 '교사' 탭(#41): TeacherSettings(출근/퇴근, 학교급 40/45/50, 교시 7개, 점심, autofill/describe) → 프롬프트 '시간표 참고' + 규칙 16. Ollama 실검증 4/4. v1.4.6 릴리스 완료(4방향 호버, 파비콘)
+- (이전) v1.4.6 — 4방향 호버 시선(hover_tl/tr/bl/br, 사용자 이미지 4장 → cat-src, prepare_cat OPTIONAL 매핑), 파비콘(favicon.ico/apple-touch-icon, ?v=3), 랜딩 시선 추적. **규칙: 사용자 요청은 먼저 이슈 등록 후 커밋에 closes #N** (#33~#40 소급 등록, 마일스톤 v1.5 표정·편의)
 - (이전) v1.4.5 — Windows 업데이트 "Security validation failure" 원인: 얼린 앱이 띄운 cmd 가 _PYI_*/_MEIPASS2 환경변수를 새 exe 에 상속 → updater.clean_env() 로 제거. 요청 표현 있으면 날짜 없어도 task(재요청 안전장치). 자동 실행(src/autostart.py: LaunchAgent/레지스트리 Run/.desktop). 업데이트 배지 = HairpinBadge(회전 빨간 핀, 이미지 모드는 오른쪽 귀 옆). README 현행화. ≤1.4.4 Windows 는 env 버그로 자동 업데이트 실패 → v1.4.5 수동 설치 1회
 - (이전) v1.4.4 릴리스(쿨메신저 Windows 전용 잠금, 카드형 중복 창). v1.4.3 릴리스. v1.4.3: 쿨메신저 '지금 확인' 실패 사유 토스트, Memo 폴더 자동 탐지 후보 확장(APPDATA/PROGRAMDATA/계정별 하위). 다음 태그 v1.4.4 에 macOS 잠금 포함
 - (이전) v1.4.2 — classifi_harness 반영(#32): 쿨메신저 '님이 보낸글 >>' 구분자, 역할(persona) 기반 scope 판정(irrelevant→항목 비움+토스트), 날짜 없는 task(undated, 태스크 due 생략), 행동형 제목 규칙. 토스트 알림(ui/toast.py: 컨테이너+windowOpacity — 최상위 QLabel+GraphicsEffect는 배경 안 그려짐). 업데이트 확인 403(API 한도) → github.com 리다이렉트 폴백. 앱 아이콘·랜딩을 새 고양이 이미지로. Edge SmartScreen 안내

@@ -46,7 +46,7 @@ class Extractor:
                 kind_rules: str = "", category_rules: str = "",
                 categories: list[str] | tuple[str, ...] = (),
                 drop_before: date | None = None, persona: str = "", skip_irrelevant: bool = True,
-                timetable: str = "") -> ExtractionResult:
+                timetable: str = "", source_chars: int = 1500) -> ExtractionResult:
         """drop_before: 이 날짜보다 앞선 항목은 버린다 (예: 쪽지 수신일 이전의 지나간 일정).
         persona: 사용자 역할. 주어지면 scope(관련성)를 판정하고, skip_irrelevant 면 무관한 내용은 항목을 비운다."""
         ref = ref or date.today()
@@ -107,6 +107,16 @@ class Extractor:
                 items = [i for i in items if i.undated or i.start.date() >= drop_before]
                 warnings.append(f"{drop_before:%m/%d} 이전의 지나간 항목 {len(past)}개를 제외했습니다: "
                                 + ", ".join(i.title[:20] for i in past[:3]))
+
+        # 원문 발췌를 항목에 실어 캘린더 설명/태스크 메모에서 참고할 수 있게
+        if source_chars > 0:
+            excerpt = text.strip()
+            if not excerpt and images:
+                excerpt = f"(이미지 {len(images)}장 입력)"
+            if len(excerpt) > source_chars:
+                excerpt = excerpt[:source_chars].rstrip() + "\n…(이하 생략)"
+            for it in items:
+                it.source_text = excerpt
 
         scope, reason = _scope_of(data) if persona.strip() else ("relevant", "")
         if scope == "irrelevant" and skip_irrelevant and items:

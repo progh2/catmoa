@@ -49,6 +49,7 @@ class ScheduleItem(BaseModel):
     confidence: float = Field(0.8, ge=0.0, le=1.0)
     source: str = ""                      # 출처 표시 ("공문.hwp", "쿨메신저: 홍길동")
     undated: bool = False                 # 날짜 없는 할 일(todo). start 는 기준일 자리표시, 캘린더 등록 불가
+    source_text: str = ""                 # 입력 원문 발췌 — 캘린더 설명/태스크 메모 하단에 넣어 나중에 참고
 
     @model_validator(mode="after")
     def _fix_end(self):

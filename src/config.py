@@ -54,6 +54,7 @@ class ScheduleSettings:
     alarm_enabled: bool = True
     alarm_minutes: int = 30
     task_alarm_as_event: bool = True    # 태스크 알람 → 캘린더 알림 이벤트 생성
+    source_text_chars: int = 1500       # 캘린더 설명/태스크 메모에 넣을 원문 길이 (0 = 넣지 않음)
     calendar_id: str = "primary"
     tasklist_id: str = ""               # "" = 기본 목록
     inbox_list_name: str = "인박스"

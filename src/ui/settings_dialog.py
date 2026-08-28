@@ -277,6 +277,14 @@ class SettingsDialog(QDialog):
         self.task_alarm_as_event = QCheckBox("태스크 알람은 캘린더 알림 이벤트로 함께 생성 (Google Tasks는 알림을 지원하지 않음)")
         self.task_alarm_as_event.setChecked(s.task_alarm_as_event)
         form.addRow("", self.task_alarm_as_event)
+        self.source_chars = QSpinBox()
+        self.source_chars.setRange(0, 4000)
+        self.source_chars.setSingleStep(100)
+        self.source_chars.setSuffix("자")
+        self.source_chars.setSpecialValueText("넣지 않음")
+        self.source_chars.setValue(s.source_text_chars)
+        self.source_chars.setToolTip("캘린더 설명과 태스크 메모 하단에 '─── 원문 ───'으로 입력 원문을 넣어 나중에 구체 내용을 확인할 수 있게 합니다")
+        form.addRow("원문 포함 길이", self.source_chars)
 
         self.autostart = QCheckBox("운영체제 시작(로그인) 시 catmoa 자동 실행")
         try:
@@ -768,6 +776,7 @@ class SettingsDialog(QDialog):
         s.alarm_enabled = self.alarm_enabled.isChecked()
         s.alarm_minutes = self.alarm_minutes.value()
         s.task_alarm_as_event = self.task_alarm_as_event.isChecked()
+        s.source_text_chars = self.source_chars.value()
         s.inbox_list_name = self.inbox_name.text().strip() or "인박스"
         s.complete_inbox_after_import = self.complete_inbox.isChecked()
         if self.calendar.count():

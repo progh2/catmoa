@@ -16,6 +16,10 @@ def task_body(item: ScheduleItem) -> dict:
         notes_parts.append(item.notes)
     if item.source:
         notes_parts.append(f"출처: {item.source}")
+    if item.source_text:
+        notes_parts.append("")
+        notes_parts.append("─── 원문 ───")
+        notes_parts.append(item.source_text[:4000])       # Tasks notes 한도 8192자
     body: dict = {"title": item.title}
     if not item.undated:
         # RFC3339. 날짜만 의미 있음 (시간 부분은 API가 버린다)

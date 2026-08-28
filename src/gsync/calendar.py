@@ -23,6 +23,10 @@ def event_body(item: ScheduleItem, alarm_minutes: int | None, *, title: str | No
     if description_extra:
         desc_parts.append(description_extra)
     desc_parts.append("catmoa 🐱 로 등록")
+    if item.source_text:
+        desc_parts.append("")
+        desc_parts.append("─── 원문 ───")
+        desc_parts.append(item.source_text[:4000])
     body: dict = {
         "summary": title or item.title,
         "description": "\n".join(desc_parts),
