@@ -23,13 +23,16 @@ PLACEHOLDERS = {
     "person": "이름", "phone": "전화", "email": "이메일", "address": "주소", "id": "주민번호",
     "document_id": "문서번호", "ip": "IP", "secret": "비밀값", "birth": "생년월일",
     "klass": "반", "student_number": "학번", "url": "개인링크",
+    "account": "계좌", "handle": "계정",
 }
 # 모델 라벨 → 우리 라벨
 MODEL_LABELS = {
     "private_person": "person", "private_address": "address", "private_phone": "phone", "phone_number": "phone",
-    "private_email": "email", "account_number": "id", "resident_id": "id", "document_id": "document_id",
+    "private_email": "email", "account_number": "account", "resident_id": "id", "document_id": "document_id",
     "ip": "ip", "ip_address": "ip", "private_secret": "secret", "secret": "secret", "birth_date": "birth",
     "private_class": "klass", "private_student_number": "student_number", "private_url": "url", "postal_code": "address",
+    # korean-pii-e5-base (강력한 마스킹)
+    "private_date": "birth", "personal_handle": "handle",
 }
 TOKEN_RE = re.compile(r"\[(" + "|".join(map(re.escape, PLACEHOLDERS.values())) + r")(\d+)\]")
 
@@ -162,12 +165,23 @@ def _choose(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(chosen, key=lambda x: x["start"])
 
 
-def mask_text(text: str, use_model: bool = True) -> MaskResult:
+def mask_text(text: str, use_model: bool = True, strong: bool = True) -> MaskResult:
+    """규칙으로 가리고, 쓸 수 있는 모델이 있으면 함께 쓴다.
+
+    strong=True 면 내려받은 korean-pii-e5-base(ONNX)를 우선 사용한다 (설정에서 켠 경우에만 설치됨).
+    """
     if not text:
         return MaskResult(masked=text)
     items = rules.all_rules(text)
     used_model = False
-    if use_model:
+    if use_model and strong:
+        from src.privacy import strong as strong_model
+
+        ss = strong_model.spans(text)
+        if ss or strong_model.active():
+            items += ss
+            used_model = True
+    if use_model and not used_model:
         ms = _model_spans(text)
         used_model = bool(ms) or _MODEL is not None
         items += ms

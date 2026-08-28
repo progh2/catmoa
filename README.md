@@ -44,13 +44,14 @@ macOS · Windows · Linux
 | 중복 검사 | 등록 전 기존 캘린더/태스크와 비교해 비슷한 항목이 있으면 **건너뛰기 / 기존 갱신 / 새로 등록** 선택 |
 | 사용자 분류 규칙 | 캘린더/태스크 분류 규칙, 태스크 카테고리(Google Tasks 목록) 규칙을 자유 텍스트로 |
 | 개인정보 마스킹 | AI로 보내기 전에 이름·전화·이메일·주민번호·주소·학번 등을 `[이름1]` 식 토큰으로 가리고(PC 안에서), 결과는 원문으로 되돌림. 캘린더 메모·태스크 원문은 가리지 않음. 설정에서 끄기/확인 가능 |
+| 강력한 마스킹 (선택) | 규칙이 놓치는 문맥형 이름·주소까지 잡는 한국어 PII 모델을 **켤 때 내려받아**(약 300MB) 이 PC 안에서 실행 |
 | Google 로그인 | JSON 파일 없이 브라우저 로그인만으로 연결 (토큰은 OS 키체인) |
 | Google Tasks 인박스 | 휴대폰 등에서 대충 적어둔 "인박스" 목록 항목을 불러와 분석·정리 (목록명 변경 가능, 없으면 생성 제안) |
 | 쿨메신저 연동 (Windows) | 새 쪽지를 기본 30초 간격으로 확인해 자동 분석 (기본 꺼짐). 답장에 쌓인 이전 대화는 분리해 최근 내용 우선. 연결 테스트 · 지금 확인 버튼 |
 | LLM 선택 | Claude / ChatGPT(OpenAI) / Gemini(Google) / Solar(Upstage) / 로컬 Ollama — 모델 목록 조회, 연결 테스트. Solar는 이미지를 Upstage 문서 인식(OCR)으로 |
 | 알람 | 항목별 알람 여부·N분 전. Google Tasks는 알림이 없어 태스크 알람은 캘린더 알림 이벤트로(옵션) |
 | 트레이 아이콘 · 숨기기 | 항상 떠 있는 트레이 아이콘. 고양이 우클릭 → **숨기기**로 트레이에 넣고, 아이콘 클릭으로 복귀(숨김 중엔 잠자는 고양이 아이콘). macOS는 메뉴 막대가 가득 차면 노치 뒤로 밀려 안 보일 수 있음 |
-| 고양이 크기 | 설정 → 일반 → 슬라이더 0.5×~3.0× (저장 즉시 반영) |
+| 고양이 크기 | 설정 → 일반 → 슬라이더 0.5×~3.0× (슬라이더를 움직이면 바로 반영, 취소하면 원래대로) |
 | 자동 실행 · 자동 업데이트 | 설정에서 OS 시작 시 자동 실행 · 새 릴리스 확인 → 배지 → 설정에서 설치(내려받기 → 교체 → 재실행) |
 
 ## 지원 환경
@@ -106,7 +107,7 @@ Python 3.11 이상. 가상환경 생성과 의존성 설치는 스크립트가 �
 4. **분류 규칙** 탭 (선택): 내 역할, 캘린더/태스크 분류 규칙, 태스크 카테고리 규칙
    · **교사** 탭: 출근·퇴근, 학교급(수업 시간), 교시·점심 시각 → "3교시", "점심시간", "퇴근 전" 해석에 사용. 1교시를 고치면 2~4교시가, 5교시를 고치면 6~7교시가 자동으로 따라오고 점심은 4교시 종료~5교시 시작으로 계산됩니다
    · **개인정보** 탭: 마스킹 켜기/끄기 + **가려보기** 로 무엇이 어떻게 가려지는지 즉시 확인
-5. **일반** 탭 (선택): 기본 대상(자동/캘린더/태스크/둘 다), 알람 기본값, 인박스 목록명, 자동 실행
+5. **일반** 탭 (선택): 기본 대상(자동/캘린더/태스크/둘 다), 알람 기본값, 인박스 목록명, 자동 실행, 고양이 크기
 6. **쿨메신저** 탭 (Windows, 선택): 사용 켜기, 간격, 이전 대화 참고 길이 → **연결 테스트**
 
 ## 사용법
@@ -125,7 +126,9 @@ Python 3.11 이상. 가상환경 생성과 의존성 설치는 스크립트가 �
 
 - 입력한 문서·이미지·쪽지 내용은 **선택한 LLM 공급자**로 전송됩니다. 외부 전송이 걱정되면 로컬 Ollama를 선택하세요.
 - 보내기 전에 **개인정보 마스킹**(기본 켜짐)이 이름·전화·이메일·주민번호·주소·학번 등을 PC 안에서 토큰으로 바꿉니다. 설정 → **개인정보** 탭에서 끄거나 **가려보기**로 확인할 수 있습니다. 이미지 속 글자는 가릴 수 없습니다.
-  - 규칙 기반 마스킹이 내장돼 있고, 문맥형 인명까지 잡으려면 [schift-ko-pii-v6](https://huggingface.co/schift-io/schift-ko-pii-v6) 모델을 함께 쓸 수 있습니다 (선택). 설정 폴더의 `pii_model/` 에 모델 파일을 두고 `pip install schift-ko-pii` 하면 자동으로 인식합니다 (환경변수 `CATMOA_PII_MODEL` 로 경로 지정 가능). **모델은 로컬에서만 돌고 네트워크를 쓰지 않습니다.**
+  - 기본은 **규칙 기반**(내장, 즉시 동작)입니다. 설정 → 개인정보 → **강력한 마스킹**을 켜면 한국어 PII 모델 ([korean-pii-e5-base](https://huggingface.co/FrameByFrame/korean-pii-e5-base), ONNX int8 약 300MB)를 한 번 내려받아 규칙과 **함께** 씁니다. 규칙만으로는 놓치는 "지우 어머님", "도현이" 같은 문맥형 이름을 잡아 줍니다.
+  - 모델은 `onnxruntime` 으로 **이 PC 안에서만** 돌고, 받은 뒤에는 인터넷이 없어도 동작합니다. 설정 폴더 `pii_model/` 에 저장되며 같은 화면에서 삭제할 수 있습니다 (환경변수 `CATMOA_PII_MODEL` 로 경로 지정 가능).
+  - 일정 날짜는 가리지 않습니다 — "9월 3일 14:00" 같은 표현은 그대로 두고, "생년월일" 맥락의 날짜만 가립니다.
 - 쿨메신저 DB는 **읽기 전용 복사본**으로만 접근하며 원본을 수정하지 않습니다.
 - Google 토큰과 API 키는 OS 키체인(macOS Keychain / Windows Credential Manager / Linux Secret Service)에 저장됩니다.
 - 별도 서버 없음. 데이터는 사용자 PC ↔ LLM ↔ Google 사이에서만 오갑니다. 업데이트 확인만 GitHub에 요청합니다.
@@ -135,6 +138,9 @@ Python 3.11 이상. 가상환경 생성과 의존성 설치는 스크립트가 �
 - 계획·아키텍처·결정 기록: [docs/PRD.md](docs/PRD.md) · 진행: [Milestones](https://github.com/progh2/catmoa/milestones) · [Issues](https://github.com/progh2/catmoa/issues)
 - 테스트: `pytest` (GUI 테스트는 offscreen)
 - 로컬 빌드: `pip install pyinstaller && python build.py` → `dist/`
+- 배포판 점검: `catmoa --selftest` (설정 폴더, 모델 실행기/설치 상태, 마스킹 시험 결과를 화면 없이 출력)
+- 강력한 마스킹 모델 갱신: `python tools/convert_pii_model.py --out dist/pii_model` 로 ONNX int8 변환 후,
+  `gh release upload pii-model-v1 dist/pii_model/*` (앱 릴리스와 별개인 prerelease 태그 — 자동 업데이트에 잡히지 않음)
 - 릴리스: `src/__init__.py`의 `__version__`을 올리고 같은 값으로 `git tag vX.Y.Z && git push origin vX.Y.Z` → GitHub Actions가 3-OS 빌드 후 Release 첨부 (버전 불일치면 실패). 실행 중인 앱들은 배지로 새 버전을 알게 됩니다.
 - 실검증 스크립트: `tools/check_llm.py <provider>` (모델 목록·연결·텍스트·이미지 추출), `tools/check_google.py --login --write`
 - Google OAuth 클라이언트 (필수, 1회):
@@ -173,7 +179,8 @@ catmoa/
 
 ## 감사
 
-- 개인정보 마스킹에 쓰는 내장 AI 모델: [schift-io/schift-ko-pii-v6](https://huggingface.co/schift-io/schift-ko-pii-v6) — 한국어 개인정보 탐지 모델. 규칙만으로는 잡기 어려운 문맥형 인명 등을 찾아냅니다. 모델은 **사용자 PC 안에서만** 동작하며 외부로 데이터를 보내지 않습니다.
+- 강력한 마스킹에 쓰는 AI 모델: [FrameByFrame/korean-pii-e5-base](https://huggingface.co/FrameByFrame/korean-pii-e5-base) (MIT) — 한국어 개인정보 탐지 모델(XLM-RoBERTa base). catmoa 는 이를 ONNX int8 로 변환해 배포합니다 (`tools/convert_pii_model.py`).
+- 개인정보 마스킹 규칙 설계는 [schift-io/schift-ko-pii-v6](https://huggingface.co/schift-io/schift-ko-pii-v6) 을 참고했습니다.
 - 쿨메신저 `.udb` 읽기 방식은 [dacisosl/coolm-helper](https://github.com/dacisosl/coolm-helper) (MIT)를 참고했습니다.
 
 ## 라이선스

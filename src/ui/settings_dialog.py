@@ -53,6 +53,27 @@ class _Task(QThread):
             self.error.emit(str(e) or f"{type(e).__name__}")
 
 
+class _ProgressTask(QThread):
+    """진행률을 알려주는 백그라운드 작업 (모델 내려받기)."""
+    progress = Signal(int, int)
+    done = Signal(object)
+    error = Signal(str)
+
+    def __init__(self, fn: Callable, parent=None):
+        super().__init__(parent)
+        self._fn = fn
+
+    def run(self):
+        try:
+            self.done.emit(self._fn())
+        except Exception as e:  # noqa: BLE001
+            import logging
+            import traceback
+
+            logging.getLogger(__name__).warning("모델 내려받기 실패:\n%s", traceback.format_exc())
+            self.error.emit(str(e) or type(e).__name__)
+
+
 class _DownloadTask(QThread):
     """업데이트 산출물 다운로드 (진행률 시그널)."""
     progress = Signal(int, int)
@@ -165,10 +186,12 @@ class SettingsDialog(QDialog):
         """
         from PySide6.QtWidgets import QAbstractSpinBox
 
-        for cls in (QComboBox, QAbstractSpinBox, QPushButton):
+        for cls in (QComboBox, QAbstractSpinBox, QPushButton, QLabel):
             for w in self.findChildren(cls):
                 if isinstance(w.parent(), (QComboBox, QAbstractSpinBox)):
                     continue                      # 내부 편집기는 부모가 책임진다
+                if isinstance(w, QLabel) and (w.wordWrap() or w.text().startswith("<")):
+                    continue                      # 줄바꿈/서식 라벨은 좁아져도 되고, 높이로 흡수된다
                 need = w.sizeHint().width()
                 if need > w.minimumWidth():
                     w.setMinimumWidth(need)
@@ -533,14 +556,10 @@ class SettingsDialog(QDialog):
         lay.addWidget(self.mask_pii)
         lay.addWidget(mask_hint)
 
-        note = QLabel("가린 내용은 <b>이 PC 밖으로 나가지 않습니다</b> — 규칙 기반 마스킹이 내장돼 있고"
-                      + (", 로컬 AI 모델(schift-ko-pii-v6)도 함께 쓰는 중입니다."
-                         if model_available() else
-                         ", 문맥형 인명 탐지 모델(schift-ko-pii-v6)은 선택 설치입니다 (README 참고).")
-                      + "<br>캘린더 설명·태스크 메모에 들어가는 <b>원문은 가리지 않습니다</b> (나중에 확인해야 하니까요).")
-        note.setStyleSheet("color: palette(mid); font-size: 13px;")
-        note.setWordWrap(True)
-        lay.addWidget(note)
+        lay.addWidget(wrapped("가린 내용은 <b>이 PC 밖으로 나가지 않습니다</b>. 캘린더 설명·태스크 메모에 들어가는 "
+                              "<b>원문은 가리지 않습니다</b> (나중에 확인해야 하니까요).", muted=True))
+
+        lay.addWidget(self._build_strong_box())
 
         lay.addWidget(wrapped("<b>🧪 제대로 가려지는지 확인</b> — 아래 글을 고쳐 넣고 눌러보세요. AI 에는 아래처럼 전달됩니다."))
         self.pii_input = QPlainTextEdit(self.SAMPLE_PII)
@@ -565,6 +584,125 @@ class SettingsDialog(QDialog):
         lay.addWidget(self.pii_output, 1)
         return w
 
+    # ---- 강력한 마스킹 (내려받는 AI 모델)
+    def _build_strong_box(self) -> QWidget:
+        from src.privacy import strong
+
+        box = QGroupBox("🛡 강력한 마스킹 (AI 모델)")
+        v = QVBoxLayout(box)
+
+        self.mask_strong, strong_hint = check_with_hint(
+            "규칙으로 못 잡는 이름·주소까지 AI 모델로 찾아내기",
+            "한국어 개인정보 탐지 모델(korean-pii-e5-base)을 이 PC 안에서 돌립니다. "
+            "규칙만으로는 놓치는 문맥형 이름·주소를 더 잡아 줍니다.")
+        self.mask_strong.setChecked(self.config.schedule.mask_strong and strong.is_installed())
+        v.addWidget(self.mask_strong)
+        v.addWidget(strong_hint)
+
+        self.strong_warn = wrapped("", muted=True)
+        v.addWidget(self.strong_warn)
+
+        row = QHBoxLayout()
+        self.btn_strong_get = QPushButton("모델 내려받기")
+        self.btn_strong_get.clicked.connect(self._strong_download)
+        self.btn_strong_del = QPushButton("모델 삭제")
+        self.btn_strong_del.clicked.connect(self._strong_remove)
+        row.addWidget(self.btn_strong_get)
+        row.addWidget(self.btn_strong_del)
+        row.addStretch(1)
+        v.addLayout(row)
+
+        self.strong_progress = QProgressBar()
+        self.strong_progress.setVisible(False)
+        v.addWidget(self.strong_progress)
+
+        self.mask_strong.toggled.connect(self._strong_toggled)
+        self._strong_task = None
+        self._strong_refresh()
+        return box
+
+    def _strong_refresh(self) -> None:
+        from src.privacy import strong
+
+        installed, runtime = strong.is_installed(), strong.runtime_available()
+        busy = self._strong_task is not None
+        self.btn_strong_get.setEnabled(runtime and not installed and not busy)
+        self.btn_strong_del.setEnabled(installed and not busy)
+        self.mask_strong.setEnabled(runtime and installed)
+        if not runtime:
+            self.strong_warn.setText("⚠️ 이 빌드에는 모델 실행기가 없어 사용할 수 없습니다.")
+        elif installed:
+            self.strong_warn.setText(f"✅ 설치됨 — {strong.installed_size() / 1e6:.0f} MB. 켜면 규칙과 함께 사용합니다.")
+        else:
+            self.strong_warn.setText(
+                "⚠️ <b>내려받을 용량이 약 300MB 입니다</b> (한 번만 받으면 계속 씁니다). "
+                "데이터 요금제나 느린 회선에서는 주의하세요. 받은 뒤에는 인터넷 없이 이 PC 안에서만 동작합니다.")
+
+    def _strong_toggled(self, on: bool) -> None:
+        from src.privacy import strong
+
+        if on and not strong.is_installed():
+            self.mask_strong.setChecked(False)
+            self._strong_download()
+
+    def _strong_download(self) -> None:
+        from src.privacy import strong
+
+        if not strong.runtime_available() or self._strong_task is not None:
+            return
+        size = strong.expected_size()
+        ok = QMessageBox.question(
+            self, "강력한 마스킹 모델 내려받기",
+            f"AI 모델을 내려받습니다.\n\n• 용량: 약 {size / 1e6:.0f} MB\n"
+            f"• 저장 위치: {strong.model_root()}\n"
+            "• 한 번만 받으면 되고, 이후에는 인터넷 없이 이 PC 안에서만 동작합니다.\n\n"
+            "데이터 사용량이 큽니다. 계속할까요?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+        self.strong_progress.setVisible(True)
+        self.strong_progress.setRange(0, 100)
+        self.strong_progress.setValue(0)
+        self.strong_warn.setText("내려받는 중…")
+
+        def work():
+            return strong.download(progress=lambda d, t: self._strong_task and self._strong_task.progress.emit(d, t))
+
+        task = _ProgressTask(work, self)
+        self._strong_task = task
+        task.progress.connect(self._strong_progress)
+        task.done.connect(lambda _: self._strong_finished(None))
+        task.error.connect(self._strong_finished)
+        task.finished.connect(lambda: setattr(self, "_strong_task", None))
+        self._strong_refresh()
+        task.start()
+
+    def _strong_progress(self, done: int, total: int) -> None:
+        if total:
+            self.strong_progress.setValue(int(done * 100 / total))
+            self.strong_progress.setFormat(f"{done / 1e6:.0f} / {total / 1e6:.0f} MB  (%p%)")
+
+    def _strong_finished(self, error: str | None) -> None:
+        self._strong_task = None
+        self.strong_progress.setVisible(False)
+        if error:
+            self.strong_warn.setText(f"❌ 내려받기 실패: {error}")
+        else:
+            self.mask_strong.setChecked(True)
+        self._strong_refresh()
+
+    def _strong_remove(self) -> None:
+        from src.privacy import strong
+
+        if QMessageBox.question(self, "모델 삭제", f"내려받은 모델을 지웁니다.\n{strong.model_root()}",
+                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        strong.remove()
+        self.mask_strong.setChecked(False)
+        self._strong_refresh()
+
     def _pii_test(self) -> None:
         """실제 파이프라인과 같은 함수로 가려 보고, 되돌리기까지 왕복 검증한다."""
         from src.privacy import mask_text, restore_text
@@ -575,7 +713,7 @@ class SettingsDialog(QDialog):
             return
         self.btn_pii_test.setEnabled(False)
         try:
-            r = mask_text(text)
+            r = mask_text(text, strong=self.mask_strong.isChecked())
         except Exception as e:  # noqa: BLE001
             self.pii_summary.setText(f"❌ 마스킹 실패: {e}")
             self.pii_output.setPlainText("")
@@ -583,7 +721,7 @@ class SettingsDialog(QDialog):
         finally:
             self.btn_pii_test.setEnabled(True)
         self.pii_output.setPlainText(r.masked)
-        engine = "규칙 + 로컬 모델" if r.used_model else "규칙"
+        engine = "규칙 + AI 모델" if r.used_model else "규칙"
         if not r.count:
             self.pii_summary.setText(f"가릴 개인정보를 찾지 못했어요 ({engine}). 이대로 AI 에 전달됩니다.")
             return
@@ -1048,6 +1186,7 @@ class SettingsDialog(QDialog):
         s.persona = self.persona.text().strip()
         s.skip_irrelevant = self.skip_irrelevant.isChecked()
         s.mask_pii = self.mask_pii.isChecked()
+        s.mask_strong = self.mask_strong.isChecked()
         if self.autostart.isChecked() != self._autostart_initial:
             try:
                 autostart.set_enabled(self.autostart.isChecked())

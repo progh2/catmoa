@@ -17,6 +17,11 @@ pypdfium2>=4.30
 olefile>=0.47
 Pillow>=10.0
 
+# 강력한 개인정보 마스킹 (선택 기능) — 모델 파일은 앱에 넣지 않고 켤 때 내려받는다.
+# 실행기만 포함: torch/transformers 없이 ONNX 로 돌린다 (tools/convert_pii_model.py 로 변환)
+onnxruntime>=1.17
+tokenizers>=0.19
+
 # Google 연동
 google-auth>=2.30
 google-auth-oauthlib>=1.2

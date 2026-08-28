@@ -46,7 +46,8 @@ class Extractor:
                 kind_rules: str = "", category_rules: str = "",
                 categories: list[str] | tuple[str, ...] = (),
                 drop_before: date | None = None, persona: str = "", skip_irrelevant: bool = True,
-                timetable: str = "", source_chars: int = 1500, mask_pii: bool = True) -> ExtractionResult:
+                timetable: str = "", source_chars: int = 1500, mask_pii: bool = True,
+                mask_strong: bool = False) -> ExtractionResult:
         """drop_before: 이 날짜보다 앞선 항목은 버린다 (예: 쪽지 수신일 이전의 지나간 일정).
         persona: 사용자 역할. 주어지면 scope(관련성)를 판정하고, skip_irrelevant 면 무관한 내용은 항목을 비운다."""
         ref = ref or date.today()
@@ -71,7 +72,7 @@ class Extractor:
         if mask_pii and text:
             from src.privacy import mask_text
 
-            mr = mask_text(text)
+            mr = mask_text(text, strong=mask_strong)
             llm_text, mapping = mr.masked, mr.mapping
             if mr.count:
                 log.info("PII 마스킹 %d곳 (%s)%s", mr.count, mr.summary(), " +모델" if mr.used_model else "")

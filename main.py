@@ -17,7 +17,26 @@ LINUX_DEPS_HINT = (
 )
 
 
+def selftest() -> int:
+    """`catmoa --selftest` — 화면 없이 상태만 찍는다 (배포판 점검·문의 대응용)."""
+    from src import __version__
+    from src import config as cfg
+    from src.privacy import mask_text, strong
+
+    print(f"catmoa {__version__}  (frozen={getattr(sys, 'frozen', False)})")
+    print(f"설정 폴더        : {cfg.config_dir()}")
+    print(f"모델 실행기      : {'있음' if strong.runtime_available() else '없음'} (onnxruntime + tokenizers)")
+    print(f"강력한 마스킹 모델: {strong.status_line()}")
+    sample = "담임 김민수 선생님께. 학생 박서연(010-1234-5678) 상담은 6/10 14:00."
+    r = mask_text(sample, strong=strong.is_installed())
+    print(f"마스킹 시험       : {r.count}곳 ({r.summary()}) · {'규칙+모델' if r.used_model else '규칙'}")
+    print(f"  {r.masked}")
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return selftest()
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError as e:

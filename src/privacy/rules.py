@@ -35,6 +35,8 @@ NUMBER_NEGATIVE = re.compile(r"문제|문항|페이지|쪽|회차|번째|차시|
 
 # 문맥 규칙 (run_masking.local_candidates)
 SECRET_RE = re.compile(r"(?:비밀번호|암호|패스워드|인증번호|OTP|API\s*키|토큰)\s*[:=：]?\s*(?P<value>[^\s,;]{4,80})", re.I)
+# 모델이 찾은 날짜를 "생년월일"로 볼지 판단하는 힌트 (일정 날짜를 가리지 않기 위한 안전장치)
+BIRTH_HINT = re.compile(r"생년월일|출생|생일|태어난")
 BIRTH_RE = re.compile(r"(?:생년월일|출생일|생일)\s*[:=：]?\s*(?P<value>\d{2,4}[./-]\d{1,2}[./-]\d{1,2}|\d{6,8})")
 LABELED_ID_RE = re.compile(r"(?:신청번호|접수번호|사번|학번|학생번호)\s*[:：]?\s*(?P<value>[A-Za-z0-9][A-Za-z0-9_-]{3,39})")
 ADDRESS_LINE_RE = re.compile(
