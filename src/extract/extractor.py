@@ -7,7 +7,14 @@ from datetime import date
 
 from pydantic import ValidationError
 
-from src.extract.prompts import REPAIR_PROMPT, SYSTEM_PROMPT, user_prompt
+import re
+
+from src.extract.prompts import REPAIR_PROMPT, REQUEST_RETRY_HINT, SYSTEM_PROMPT, user_prompt
+
+# 요청·부탁·지시 표현 (날짜 없는 할 일 재요청 트리거)
+_REQUEST_CUE_RE = re.compile(
+    r"(해\s*주세요|해주세요|주시기\s*바랍니다|바랍니다|부탁|요망|제출|회신|확인\s*바|알려\s*주|작성해|참석\s*여부|협조|신청해|보내\s*주|제출해|입력해|등록해)"
+)
 from src.extract.schema import RawItem, ScheduleItem, normalize
 from src.llm.base import ImageInput, LLMError, LLMProvider, LLMRequest, extract_json
 from src.parsers import ParsedInput
@@ -78,6 +85,19 @@ class Extractor:
                 raise ExtractionError(f"모델 응답을 해석할 수 없습니다: {e}") from e
 
         items, skipped = _to_items(data, ref, source)
+        if not items and text and _REQUEST_CUE_RE.search(text):
+            # 모델이 놓친 '날짜 없는 요청' — 요청 표현이 있으면 task 로 한 번 더 요청
+            log.info("요청 표현 있음, task 추출 재요청")
+            req3 = LLMRequest(system=SYSTEM_PROMPT, text=req.text + "\n\n" + REQUEST_RETRY_HINT,
+                              images=images, json_mode=True, max_tokens=4096)
+            try:
+                raw2 = self._call(req3)
+                data2 = extract_json(raw2)
+                items2, _ = _to_items(data2, ref, source)
+                if items2:
+                    items, raw, data = items2, raw2, data2
+            except (ExtractionError, ValueError) as e:
+                log.info("재요청 실패(무시): %s", e)
         if skipped:
             warnings.append(f"날짜를 확정할 수 없는 항목 {skipped}개를 제외했습니다.")
         if drop_before is not None:

@@ -323,5 +323,14 @@ def apply(archive: Path, quit_app: Callable[[], None]) -> None:
         kwargs["close_fds"] = True
     else:
         kwargs["start_new_session"] = True
-    subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
+    # PyInstaller 내부 환경변수(_PYI_*, _MEIPASS2)가 스크립트 → 새 exe 로 상속되면 새 부트로더가 자신을 '자식'으로
+    # 오인해 "Security validation failure: failed to obtain executable path for parent process" 로 죽는다 → 제거
+    subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     env=clean_env(), **kwargs)
     quit_app()
+
+
+def clean_env(base: dict | None = None) -> dict:
+    """얼린 앱이 다른 얼린 앱/스크립트를 띄울 때 넘길 환경: PyInstaller 부트로더 변수를 뺀다."""
+    src = dict(os.environ if base is None else base)
+    return {k: v for k, v in src.items() if not (k.startswith("_PYI_") or k in ("_MEIPASS2", "_MEIPASS"))}

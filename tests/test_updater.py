@@ -178,6 +178,34 @@ def test_swap_script_generation(tmp_path):
         assert os.access(script, os.X_OK)
 
 
+def test_clean_env_strips_pyinstaller_vars():
+    env = updater.clean_env({"PATH": "x", "_PYI_ARCHIVE_FILE": "a", "_PYI_PARENT_PROCESS_LEVEL": "1",
+                             "_MEIPASS2": "m", "HOME": "h"})
+    assert env == {"PATH": "x", "HOME": "h"}
+
+
+def test_apply_spawns_script_with_clean_env(tmp_path, monkeypatch):
+    """frozen 상태를 흉내 내어 Popen 에 PyInstaller 변수 없는 env 가 전달되는지 확인."""
+    monkeypatch.setattr(updater, "is_frozen", lambda: True)
+    monkeypatch.setattr(updater, "install_root", lambda: tmp_path / "install" / "catmoa")
+    (tmp_path / "install" / "catmoa").mkdir(parents=True)
+    monkeypatch.setattr(updater, "extract", lambda a: tmp_path / "new" / "catmoa")
+    (tmp_path / "new" / "catmoa").mkdir(parents=True)
+    monkeypatch.setenv("_PYI_ARCHIVE_FILE", "x.exe")
+    monkeypatch.setenv("_MEIPASS2", "C:/tmp/_MEI1")
+    calls = []
+
+    class _P:
+        def __init__(self, cmd, **kw):
+            calls.append((cmd, kw))
+    monkeypatch.setattr(updater.subprocess, "Popen", _P)
+    quit_called = []
+    updater.apply(tmp_path / "a.tar.gz", lambda: quit_called.append(1))
+    assert calls and quit_called
+    env = calls[0][1]["env"]
+    assert "_PYI_ARCHIVE_FILE" not in env and "_MEIPASS2" not in env and "PATH" in env
+
+
 def test_apply_refuses_when_not_frozen(tmp_path):
     with pytest.raises(updater.UpdateError, match="소스로 실행"):
         updater.apply(tmp_path / "x.zip", lambda: None)

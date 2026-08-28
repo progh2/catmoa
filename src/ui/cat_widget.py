@@ -32,6 +32,49 @@ BORED_AFTER_MS = 5 * 60 * 1000       # 입력 없이 5분 → 지루함
 SLEEP_AFTER_MS = 30 * 60 * 1000      # 30분 → 잠
 
 
+class HairpinBadge(QWidget):
+    """고양이 머리에 꽂은 머리핀 모양의 업데이트 배지 — 기울어진 빨간 알약 + ⬆."""
+    clicked = Signal()
+    ANGLE = -18
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setFixedSize(44, 30)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+    def paintEvent(self, e) -> None:
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QPainter, QPen
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        p.translate(self.width() / 2, self.height() / 2)
+        p.rotate(self.ANGLE)
+        w, h = 34, 16
+        rect = QRectF(-w / 2, -h / 2, w, h)
+        p.setPen(QPen(QColor(150, 20, 30), 1.5))
+        p.setBrush(QColor(226, 48, 58))
+        p.drawRoundedRect(rect, h / 2, h / 2)
+        # 핀 광택
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(255, 255, 255, 70))
+        p.drawRoundedRect(QRectF(-w / 2 + 3, -h / 2 + 2, w - 6, h / 2 - 2), 4, 4)
+        f = p.font()
+        f.setPixelSize(12)
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(QColor("white"))
+        p.drawText(rect, Qt.AlignmentFlag.AlignCenter, "⬆ new")
+        p.end()
+
+    def mousePressEvent(self, e) -> None:
+        if e.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+            e.accept()
+
+
 class CatWidget(QWidget):
     items_received = Signal(list)        # list[InputItem]
     unsupported = Signal(str)            # 사용자 안내 메시지
@@ -65,19 +108,17 @@ class CatWidget(QWidget):
         top.setContentsMargins(6, 0, 6, 0)
         self.badge = QLabel("", objectName="badge")
         self.badge.hide()
-        self.update_badge = QLabel("⬆", objectName="updateBadge")
-        self.update_badge.setCursor(Qt.CursorShape.PointingHandCursor)
+        # 업데이트 배지: 고양이 머리에 꽂은 머리핀처럼 (레이아웃 밖 오버레이, 기울어진 빨간 핀)
+        self.update_badge = HairpinBadge(self)
+        self.update_badge.clicked.connect(self.update_requested.emit)
         self.update_badge.hide()
-        self.update_badge.mousePressEvent = lambda e: self.update_requested.emit()  # type: ignore[assignment]
-        # 숨겨져 있어도 자리를 차지하게 → 호버/배지 표시 때 창 크기가 변하지 않는다
-        for w in (self.badge, self.update_badge):
-            sp = w.sizePolicy()
-            sp.setRetainSizeWhenHidden(True)
-            w.setSizePolicy(sp)
+        # 숨겨져 있어도 자리를 차지하게 → 배지 표시 때 창 크기가 변하지 않는다
+        sp = self.badge.sizePolicy()
+        sp.setRetainSizeWhenHidden(True)
+        self.badge.setSizePolicy(sp)
         self.badge.setText("00")          # 자리 확보용 최대 폭 텍스트로 크기 계산
         top.addWidget(self.badge)
         top.addStretch(1)
-        top.addWidget(self.update_badge)
 
         self.face = QLabel(objectName="catFace")
         self.face.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -94,13 +135,14 @@ class CatWidget(QWidget):
         root.addLayout(top)
         root.addWidget(self.face)
         # 위 줄(배지/⚙) 높이를 고정하고 창 전체를 고정 크기로 잠근다
-        top_h = max(self.badge.sizeHint().height(), self.update_badge.sizeHint().height())
-        for w in (self.badge, self.update_badge):
-            w.setFixedHeight(top_h)
+        top_h = self.badge.sizeHint().height()
+        self.badge.setFixedHeight(top_h)
         self.badge.setText("")
         # face 는 _fix_face_size 에서 setFixedSize 됨 → 레이아웃 전이라도 minimumWidth/Height 가 확정값
         fw, fh = self.face.minimumWidth(), self.face.minimumHeight()
         self.setFixedSize(fw, top_h + fh)
+        self._top_h = top_h
+        self._place_update_badge()
 
         # ---- 타이머
         self._anim = QTimer(self)
@@ -150,12 +192,27 @@ class CatWidget(QWidget):
             self.face.setToolTip(message)
 
     def set_update_available(self, version: str | None) -> None:
-        """새 버전이 있으면 ⬆ 배지를 항상 표시 (호버와 무관)."""
+        """새 버전이 있으면 머리핀 배지를 항상 표시 (호버와 무관)."""
         if version:
             self.update_badge.setToolTip(f"새 버전 v{version} 이 있습니다 — 클릭해서 업데이트")
+            self._place_update_badge()
             self.update_badge.show()
+            self.update_badge.raise_()
         else:
             self.update_badge.hide()
+
+    def _place_update_badge(self) -> None:
+        """머리핀 위치: 이미지 모드는 오른쪽 귀 아래(머리 오른쪽 위), 텍스트 모드는 말풍선 오른쪽 위 모서리."""
+        b = self.update_badge
+        fw, fh = self.face.minimumWidth(), self.face.minimumHeight()
+        top = getattr(self, "_top_h", 0)
+        if self._images:
+            x = int(fw * 0.66)
+            y = top + int(fh * 0.16)
+        else:
+            x = fw - b.width() + 6
+            y = max(0, top - b.height() // 2 + 2)
+        b.move(x, y)
 
     def set_queue_size(self, n: int) -> None:
         self._queue_size = n

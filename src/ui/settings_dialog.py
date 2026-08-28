@@ -11,9 +11,11 @@ from PySide6.QtCore import QThread, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QTabWidget,
+    QVBoxLayout, QWidget,
 )
 
+from src import autostart
 from src import config as cfg
 from src import updater
 from src.llm import KEY_HELP, PROVIDERS, SECRET_FOR_PROVIDER, create_provider
@@ -274,6 +276,15 @@ class SettingsDialog(QDialog):
         self.task_alarm_as_event = QCheckBox("태스크 알람은 캘린더 알림 이벤트로 함께 생성 (Google Tasks는 알림을 지원하지 않음)")
         self.task_alarm_as_event.setChecked(s.task_alarm_as_event)
         form.addRow("", self.task_alarm_as_event)
+
+        self.autostart = QCheckBox("운영체제 시작(로그인) 시 catmoa 자동 실행")
+        try:
+            self.autostart.setChecked(autostart.is_enabled())
+        except Exception:  # noqa: BLE001
+            self.autostart.setChecked(False)
+        self._autostart_initial = self.autostart.isChecked()
+        self.autostart.setToolTip("macOS: 로그인 항목(LaunchAgent) · Windows: 시작 프로그램(레지스트리 Run) · Linux: ~/.config/autostart")
+        form.addRow("시작", self.autostart)
 
         self.inbox_name = QLineEdit(s.inbox_list_name)
         form.addRow("인박스 태스크 목록명", self.inbox_name)
@@ -649,6 +660,12 @@ class SettingsDialog(QDialog):
         s.category_rules = self.category_rules.toPlainText().strip()
         s.persona = self.persona.text().strip()
         s.skip_irrelevant = self.skip_irrelevant.isChecked()
+        if self.autostart.isChecked() != self._autostart_initial:
+            try:
+                autostart.set_enabled(self.autostart.isChecked())
+                self._autostart_initial = self.autostart.isChecked()
+            except autostart.AutostartError as e:
+                QMessageBox.warning(self, "자동 실행", str(e))
         s.alarm_enabled = self.alarm_enabled.isChecked()
         s.alarm_minutes = self.alarm_minutes.value()
         s.task_alarm_as_event = self.task_alarm_as_event.isChecked()

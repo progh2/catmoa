@@ -72,6 +72,22 @@ def test_extractor_undated_and_scope():
     assert len(r4.items) == 2 and any("불확실" in w for w in r4.warnings)
 
 
+def test_request_without_date_retried_as_task():
+    # 1차: 빈 결과, 2차(재요청): 날짜 없는 task
+    p = FakeProvider(['{"items": []}', '{"items": [{"title": "명단 제출", "date": null, "kind": "task"}]}'])
+    r = Extractor(p).extract(ParsedInput(text="선생님, 동아리 명단 제출해 주세요."), REF)
+    assert len(p.calls) == 2 and "요청·부탁 표현" in p.calls[1].text
+    assert [i.title for i in r.items] == ["명단 제출"] and r.items[0].undated
+    # 요청 표현이 없으면 재요청하지 않음
+    p2 = FakeProvider(['{"items": []}'])
+    r2 = Extractor(p2).extract(ParsedInput(text="오늘 날씨가 좋네요. 감사합니다."), REF)
+    assert len(p2.calls) == 1 and r2.items == []
+    # 1차에서 이미 항목이 있으면 재요청하지 않음
+    p3 = FakeProvider(['{"items": [{"title": "회의", "date": "2026-06-10"}]}'])
+    Extractor(p3).extract(ParsedInput(text="회의 참석 바랍니다"), REF)
+    assert len(p3.calls) == 1
+
+
 def test_drop_before_keeps_undated():
     resp = json.dumps({"items": [{"title": "정리", "date": None, "kind": "task"}, {"title": "옛날", "date": "2026-06-01", "kind": "task"}]})
     r = Extractor(FakeProvider([resp])).extract(ParsedInput(text="x"), REF, drop_before=REF)
