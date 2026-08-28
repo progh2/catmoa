@@ -24,20 +24,20 @@ DEFAULT_LIST_LABEL = "(기본 목록)"
 REVIEW_QSS = """
 QDialog#reviewDialog, QDialog#editDialog { background: #fffaf0; }
 QLabel { color: #3a2e1e; }
-QPushButton { background: #ffffff; border: 1.5px solid #f0c27b; border-radius: 12px; padding: 5px 12px; color: #3a2e1e; }
+QPushButton { background: #ffffff; border: 1.2px solid #f0c27b; border-radius: 9px; padding: 3px 10px; color: #3a2e1e; font-size: 12px; }
 QPushButton:hover { background: #fff3e0; }
 QPushButton:pressed { background: #ffe6c4; }
 QPushButton:disabled { color: #b8ab9a; border-color: #eadfcf; background: #fdf8f1; }
-QPushButton#btnCal { background: #ffe9d6; border-color: #f2a65a; }
-QPushButton#btnCal:hover { background: #ffdcbb; }
-QPushButton#btnTask { background: #e3f6e8; border-color: #6fbf73; }
-QPushButton#btnTask:hover { background: #d2efd9; }
-QPushButton#btnBoth { background: #ece6fa; border-color: #a78bfa; }
-QPushButton#btnBoth:hover { background: #e0d6f7; }
 QPushButton#btnOk { background: #f2a65a; border-color: #e0903f; color: white; font-weight: 600; }
 QPushButton#btnOk:hover { background: #ea9a48; }
-QPushButton#btnAux { border-color: #eadfcf; color: #6b5d4c; padding: 3px 10px; }
-#reviewCard { background: #ffffff; border: 2px solid #f0c27b; border-radius: 16px; }
+QPushButton#btnAux { border: none; background: transparent; color: #a08f7a; padding: 1px 6px; font-size: 11px; }
+QPushButton#btnAux:hover { color: #f2a65a; background: transparent; }
+/* 등록 대상 체크박스 — 작은 칩 느낌 */
+QCheckBox#pickCal, QCheckBox#pickTask { font-size: 12px; color: #6b5d4c; spacing: 5px; padding: 1px 2px; }
+QCheckBox#pickCal:checked { color: #d97706; font-weight: 600; }
+QCheckBox#pickTask:checked { color: #2f855a; font-weight: 600; }
+QCheckBox#pickCal:disabled, QCheckBox#pickTask:disabled { color: #cbbfae; }
+#reviewCard { background: #ffffff; border: 1.5px solid #f0c27b; border-radius: 13px; }
 QLineEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox { background: #ffffff; border: 1px solid #eadfcf; border-radius: 8px; padding: 2px 6px; }
 """
 
@@ -322,8 +322,8 @@ class ReviewDialog(QDialog):
         self.setObjectName("reviewDialog")
         self.setStyleSheet(REVIEW_QSS)
         self.setWindowTitle(f"catmoa — {source_label}" if source_label else "catmoa")
-        self.setMinimumWidth(380)
-        self.resize(410, 280)
+        self.setMinimumWidth(330)
+        self.resize(350, 228)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         tasklists = tasklists or []
         self._settings = settings
@@ -340,15 +340,15 @@ class ReviewDialog(QDialog):
         self._done: list[bool] = [False] * len(self.rows)   # 카드에서 처리(선택/건너뜀)했는지
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(14, 10, 14, 10)
-        lay.setSpacing(8)
+        lay.setContentsMargins(11, 8, 11, 8)
+        lay.setSpacing(6)
 
         # 진행 표시
         top = QHBoxLayout()
         self.progress_label = QLabel()
-        self.progress_label.setStyleSheet("color: #f2a65a; font-size: 12px; letter-spacing: 2px;")
+        self.progress_label.setStyleSheet("color: #f2a65a; font-size: 11px; letter-spacing: 2px;")
         self.source_label = QLabel(source_label)
-        self.source_label.setStyleSheet("color: #a08f7a; font-size: 11px;")
+        self.source_label.setStyleSheet("color: #a08f7a; font-size: 10px;")
         top.addWidget(self.source_label)
         top.addStretch(1)
         top.addWidget(self.progress_label)
@@ -357,18 +357,18 @@ class ReviewDialog(QDialog):
         # 카드
         self.card = QFrame(objectName="reviewCard")
         card_lay = QVBoxLayout(self.card)
-        card_lay.setContentsMargins(16, 13, 16, 11)
-        card_lay.setSpacing(5)
+        card_lay.setContentsMargins(12, 9, 12, 8)
+        card_lay.setSpacing(3)
         self.card_title = QLabel()
         self.card_title.setWordWrap(True)
-        self.card_title.setStyleSheet("font-size: 16px; font-weight: 600;")
+        self.card_title.setStyleSheet("font-size: 14px; font-weight: 600;")
         self.card_when = QLabel()
-        self.card_when.setStyleSheet("font-size: 13px;")
+        self.card_when.setStyleSheet("font-size: 12px;")
         self.card_where = QLabel()
-        self.card_where.setStyleSheet("font-size: 12px; color: #8a7a66;")
+        self.card_where.setStyleSheet("font-size: 11px; color: #8a7a66;")
         self.card_where.setWordWrap(True)
         self.card_choice = QLabel()
-        self.card_choice.setStyleSheet("font-size: 11px; color: #a08f7a;")
+        self.card_choice.setStyleSheet("font-size: 10px; color: #bcae9c;")
         card_lay.addWidget(self.card_title)
         card_lay.addWidget(self.card_when)
         card_lay.addWidget(self.card_where)
@@ -376,66 +376,62 @@ class ReviewDialog(QDialog):
         card_lay.addWidget(self.card_choice)
         lay.addWidget(self.card, 1)
 
-        # 주요 선택 버튼
-        choose = QHBoxLayout()
-        choose.setSpacing(8)
-        self.btn_cal = QPushButton("📅 캘린더")
-        self.btn_task = QPushButton("✅ 태스크")
-        self.btn_both = QPushButton("📅+✅ 둘 다")
-        self.btn_cal.setObjectName("btnCal")
-        self.btn_task.setObjectName("btnTask")
-        self.btn_both.setObjectName("btnBoth")
-        for b, t in ((self.btn_cal, {"calendar"}), (self.btn_task, {"task"}), (self.btn_both, {"calendar", "task"})):
-            b.setMinimumHeight(34)
-            b.clicked.connect(lambda _=False, tt=t: self._choose(tt))
-            choose.addWidget(b, 1)
-        lay.addLayout(choose)
+        # 등록 대상: 체크박스 두 개 (둘 다 끄면 건너뜀) + 다음/등록
+        act = QHBoxLayout()
+        act.setSpacing(10)
+        self.chk_cal = QCheckBox("📅 캘린더", objectName="pickCal")
+        self.chk_task = QCheckBox("✅ 태스크", objectName="pickTask")
+        for c in (self.chk_cal, self.chk_task):
+            c.toggled.connect(self._picked)
+            act.addWidget(c)
+        act.addStretch(1)
+        self.btn_skip = QPushButton("건너뛰기")
+        self.btn_skip.setObjectName("btnAux")
+        self.btn_skip.clicked.connect(self._skip)
+        self.btn_next = QPushButton("다음 →")
+        self.btn_next.setObjectName("btnOk")
+        self.btn_next.setMinimumWidth(72)
+        self.btn_next.clicked.connect(self._next)
+        self.ok = QPushButton("등록")
+        self.ok.setObjectName("btnOk")
+        self.ok.setMinimumWidth(78)
+        self.ok.clicked.connect(self._submit)
+        act.addWidget(self.btn_skip)
+        act.addWidget(self.btn_next)
+        act.addWidget(self.ok)
+        lay.addLayout(act)
 
-        # 보조 버튼
+        # 보조 (작은 링크형)
         aux = QHBoxLayout()
+        aux.setSpacing(4)
         self.btn_prev = QPushButton("← 이전")
         self.btn_prev.clicked.connect(self._prev)
-        self.btn_skip = QPushButton("건너뛰기")
-        self.btn_skip.clicked.connect(self._skip)
         self.btn_edit = QPushButton("수정…")
         self.btn_edit.clicked.connect(self._edit)
         self.btn_rest = QPushButton("나머지 기본대로")
         self.btn_rest.setToolTip("남은 항목을 AI 제안(또는 설정의 기본 대상)대로 한 번에 처리")
         self.btn_rest.clicked.connect(self._rest_default)
-        for b in (self.btn_prev, self.btn_skip, self.btn_edit, self.btn_rest):
+        self.btn_cancel = QPushButton("취소")
+        self.btn_cancel.clicked.connect(self.reject)
+        for b in (self.btn_prev, self.btn_edit, self.btn_rest, self.btn_cancel):
             b.setObjectName("btnAux")
         aux.addWidget(self.btn_prev)
         aux.addStretch(1)
-        aux.addWidget(self.btn_skip)
         aux.addWidget(self.btn_edit)
         aux.addWidget(self.btn_rest)
+        aux.addWidget(self.btn_cancel)
         lay.addLayout(aux)
-
-        # 요약 카드 하단 (등록/취소)
-        foot = QHBoxLayout()
-        foot.addStretch(1)
-        self.btn_cancel = QPushButton("취소")
-        self.btn_cancel.clicked.connect(self.reject)
-        self.ok = QPushButton("등록")
-        self.ok.setObjectName("btnOk")
-        self.ok.setMinimumHeight(34)
-        self.ok.setMinimumWidth(96)
-        self.btn_cancel.setObjectName("btnAux")
-        self.ok.clicked.connect(self._submit)
-        foot.addWidget(self.btn_cancel)
-        foot.addWidget(self.ok)
-        lay.addLayout(foot)
 
         self.note = QLabel()
         self.note.setWordWrap(True)
         self.note.setStyleSheet("color: #c58a2a; font-size: 10px;")
         lay.addWidget(self.note)
 
-        # 단축키: 1/2/3 선택, S 건너뛰기, E 수정, ← 이전
+        # 단축키: 1/2 체크 토글, 3 둘 다, Enter 다음, S 건너뛰기, E 수정, ← 이전
         from PySide6.QtGui import QShortcut, QKeySequence
-        for key, fn in (("1", lambda: self._choose({"calendar"})), ("2", lambda: self._choose({"task"})),
+        for key, fn in (("1", self.chk_cal.toggle), ("2", self.chk_task.toggle),
                         ("3", lambda: self._choose({"calendar", "task"})), ("S", self._skip), ("E", self._edit),
-                        ("Left", self._prev), ("Backspace", self._prev)):
+                        ("Right", self._next), ("Left", self._prev), ("Backspace", self._prev)):
             QShortcut(QKeySequence(key), self, activated=fn)
 
         self._render()
@@ -447,10 +443,10 @@ class ReviewDialog(QDialog):
 
     def _render(self) -> None:
         n = len(self.rows)
-        for w in (self.btn_cal, self.btn_task, self.btn_both, self.btn_skip, self.btn_edit, self.btn_rest):
-            w.setVisible(not self.at_summary)
+        for w in (self.chk_cal, self.chk_task, self.btn_skip, self.btn_next, self.btn_edit, self.btn_rest):
+            w.setVisible(not self.at_summary and n > 0)
         self.btn_prev.setVisible(n > 0 and self._idx > 0)
-        self.ok.setVisible(self.at_summary)
+        self.ok.setVisible(self.at_summary or n == 0)
         self.btn_cancel.setVisible(True)
         self.note.setText("  ·  ".join(self._warnings) if self._warnings else "")
         self.note.setVisible(bool(self._warnings))
@@ -499,18 +495,19 @@ class ReviewDialog(QDialog):
         if row.task.isChecked() and row.tasklist.currentData():
             where.append("📂 " + row.tasklist.currentText())
         self.card_where.setText("   ".join(where))
-        # 현재 선택 상태 (돌아왔을 때)
+        # 현재 선택 상태를 체크박스에 반영 (돌아왔을 때 / AI 제안 그대로)
         t = row.targets()
+        undated = row.no_date.isChecked()
+        for c, key in ((self.chk_cal, "calendar"), (self.chk_task, "task")):
+            c.blockSignals(True)
+            c.setChecked(key in t)
+            c.blockSignals(False)
+        self.chk_cal.setEnabled(not undated)
+        self.chk_cal.setToolTip("날짜 없는 할 일은 캘린더에 넣을 수 없어요" if undated else "")
         label = {frozenset({"calendar"}): "📅 캘린더", frozenset({"task"}): "✅ 태스크",
-                 frozenset({"calendar", "task"}): "📅+✅ 둘 다"}.get(frozenset(t), "건너뛰기")
-        self.card_choice.setText(f"{'선택됨' if self._done[self._idx] else 'AI 제안'}: {label}")
-        self.btn_cal.setEnabled(not row.no_date.isChecked())
-        self.btn_both.setEnabled(not row.no_date.isChecked())
-        # 기본 제안 버튼을 기본(Enter)으로
-        for b in (self.btn_cal, self.btn_task, self.btn_both):
-            b.setDefault(False)
-        {frozenset({"calendar"}): self.btn_cal, frozenset({"task"}): self.btn_task,
-         frozenset({"calendar", "task"}): self.btn_both}.get(frozenset(t), self.btn_task).setDefault(True)
+                 frozenset({"calendar", "task"}): "📅+✅ 둘 다"}.get(frozenset(t), "건너뜀")
+        self.card_choice.setText(f"{'선택됨' if self._done[self._idx] else 'AI 제안'} · {label}")
+        self.btn_next.setDefault(True)
 
     @staticmethod
     def _describe_row(row: _Row) -> str:
@@ -526,7 +523,30 @@ class ReviewDialog(QDialog):
         return s
 
     # ------------------------------------------------------------ 동작
+    def _picked(self, *_) -> None:
+        """체크박스를 건드리면 현재 카드에 바로 반영 (넘기지는 않는다)."""
+        if self.at_summary or not self.rows:
+            return
+        row = self.rows[self._idx]
+        targets = set()
+        if self.chk_cal.isChecked() and not row.no_date.isChecked():
+            targets.add("calendar")
+        if self.chk_task.isChecked():
+            targets.add("task")
+        row.set_targets(targets)
+        self._done[self._idx] = True
+        self._render()
+
+    def _next(self) -> None:
+        """현재 체크 상태대로 확정하고 다음 카드로 (둘 다 꺼져 있으면 건너뜀)."""
+        if self.at_summary or not self.rows:
+            return
+        self._done[self._idx] = True
+        self._idx += 1
+        self._render()
+
     def _choose(self, targets: set[str]) -> None:
+        """대상을 지정하고 바로 다음 카드로 (단축키 3 / 하위 호환)."""
         if self.at_summary or not self.rows:
             return
         row = self.rows[self._idx]

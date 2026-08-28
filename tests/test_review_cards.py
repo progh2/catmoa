@@ -31,13 +31,13 @@ def test_card_flow_choose_skip_summary(app):
     d = ReviewDialog(_items(), cfg.ScheduleSettings(alarm_enabled=True, alarm_minutes=20), tasklists=LISTS)
     assert d.progress_label.text().endswith("1 / 3") and d.progress_label.text().startswith("◉○○")
     assert d.card_title.text() == "운영위원회" and "14:00~16:00" in d.card_when.text()
-    assert "📍 회의실" in d.card_where.text() and "AI 제안: 📅 캘린더" in d.card_choice.text()
+    assert "📍 회의실" in d.card_where.text() and "AI 제안 · 📅 캘린더" in d.card_choice.text()
     assert not d.btn_prev.isVisible() if d.isVisible() else True
     d._choose({"calendar", "task"})                       # 1번: 둘 다
     assert d.progress_label.text().endswith("2 / 3") and "📂 학교" in d.card_where.text()
     d._skip()                                             # 2번: 건너뛰기
     assert d.progress_label.text().endswith("3 / 3") and "날짜 없음" in d.card_when.text()
-    assert not d.btn_cal.isEnabled() and not d.btn_both.isEnabled()   # 날짜 없는 할 일은 태스크만
+    assert not d.chk_cal.isEnabled()                                   # 날짜 없는 할 일은 태스크만
     d._choose({"calendar"})                               # 캘린더를 눌러도 태스크로 보정
     assert d.at_summary and "2개 등록 준비 완료" in d.card_title.text()
     ds = d.decisions()
@@ -48,13 +48,29 @@ def test_card_flow_choose_skip_summary(app):
     d._prev()
     assert d.progress_label.text().endswith("3 / 3") and "선택됨" in d.card_choice.text()
     d._prev(); d._prev()
-    assert d.progress_label.text().endswith("1 / 3") and "선택됨: 📅+✅ 둘 다" in d.card_choice.text()
+    assert d.progress_label.text().endswith("1 / 3") and "선택됨 · 📅+✅ 둘 다" in d.card_choice.text()
     got = []
     d.submitted.connect(got.append)
     d._rest_default()                                     # 나머지 기본대로 → 요약
     assert d.at_summary
     d._submit()
     assert len(got[0]) == 2 and got[0][0].targets == {"calendar", "task"}
+
+
+def test_checkbox_pick_and_next(app):
+    """체크박스로 대상을 고르고 '다음'으로 넘긴다 — 둘 다 끄면 건너뜀."""
+    d = ReviewDialog(_items(), cfg.ScheduleSettings(), tasklists=LISTS)
+    assert d.chk_cal.isChecked() and not d.chk_task.isChecked()      # AI 제안: 캘린더
+    d.chk_task.setChecked(True)                                      # 둘 다
+    assert d.rows[0].targets() == {"calendar", "task"} and "선택됨 · 📅+✅ 둘 다" in d.card_choice.text()
+    d._next()
+    assert d.progress_label.text().endswith("2 / 3")
+    d.chk_task.setChecked(False)                                     # 둘 다 끄기 = 건너뜀
+    assert d.rows[1].targets() == set() and "건너뜀" in d.card_choice.text()
+    d._next()
+    assert d.chk_task.isChecked() and not d.chk_cal.isEnabled()      # 날짜 없는 할 일
+    d._next()
+    assert d.at_summary and [x.targets for x in d.decisions()] == [{"calendar", "task"}, {"task"}]
 
 
 def test_rest_default_uses_ai_suggestion(app):
