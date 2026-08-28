@@ -142,6 +142,7 @@ Python 3.11 이상. 가상환경 생성과 의존성 설치는 스크립트가 �
 - 강력한 마스킹 모델 갱신: `python tools/convert_pii_model.py --out dist/pii_model` 로 ONNX int8 변환 후,
   `gh release upload pii-model-v1 dist/pii_model/*` (앱 릴리스와 별개인 prerelease 태그 — 자동 업데이트에 잡히지 않음)
 - 릴리스: `src/__init__.py`의 `__version__`을 올리고 같은 값으로 `git tag vX.Y.Z && git push origin vX.Y.Z` → GitHub Actions가 3-OS 빌드 후 Release 첨부 (버전 불일치면 실패). 실행 중인 앱들은 배지로 새 버전을 알게 됩니다.
+- 릴리스 노트는 `tools/release_notes.py` 가 태그 사이 커밋을 `feat`/`fix`/… 로 묶어 한국어로 만듭니다 (CI가 자동 실행). 앱의 **설정 → 업데이트** 탭도 이 내용을 그대로 보여주므로, 커밋 제목을 사용자가 읽을 문장으로 씁니다.
 - 실검증 스크립트: `tools/check_llm.py <provider>` (모델 목록·연결·텍스트·이미지 추출), `tools/check_google.py --login --write`
 - Google OAuth 클라이언트 (필수, 1회):
   1. [Google Cloud Console](https://console.cloud.google.com/) → 프로젝트 → **API 및 서비스**에서 *Google Calendar API*, *Google Tasks API* 사용 설정

@@ -12,7 +12,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGridLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSlider, QSpinBox,
-    QScrollArea, QTabWidget, QTimeEdit, QVBoxLayout, QWidget,
+    QScrollArea, QTabWidget, QTextBrowser, QTimeEdit, QVBoxLayout, QWidget,
 )
 
 from src import autostart
@@ -1099,16 +1099,17 @@ class SettingsDialog(QDialog):
         self.update_progress.hide()
         lay.addWidget(self.update_progress)
 
-        self.update_notes = QPlainTextEdit()
-        self.update_notes.setReadOnly(True)
+        lay.addWidget(QLabel("<b>이번 버전에서 달라진 점</b>"))
+        # 릴리스 노트는 마크다운이라 QTextBrowser 로 보기 좋게 (제목·목록·링크)
+        self.update_notes = QTextBrowser()
+        self.update_notes.setOpenExternalLinks(True)
+        self.update_notes.setMinimumHeight(180)
         self.update_notes.setPlaceholderText("릴리스 노트")
-        self.update_notes.setMaximumHeight(140)
-        lay.addWidget(self.update_notes)
+        lay.addWidget(self.update_notes, 1)
 
         self.update_check_on_start = QCheckBox("시작할 때 자동으로 업데이트 확인 (고양이 옆에 ⬆ 표시)")
         self.update_check_on_start.setChecked(self.config.update.check_on_start)
         lay.addWidget(self.update_check_on_start)
-        lay.addStretch(1)
 
         if self._update_info:
             self._show_update_info(self._update_info)
@@ -1119,13 +1120,35 @@ class SettingsDialog(QDialog):
         if info is None:
             self.update_status.setText("✅ 최신 버전입니다.")
             self.btn_update_install.setEnabled(False)
-            self.update_notes.setPlainText("")
+            self.update_notes.setMarkdown("")
             return
         self.update_status.setText(f"🆕 v{info.version} 사용 가능 ({info.asset_name})")
-        self.update_notes.setPlainText(info.notes or "(릴리스 노트 없음)")
+        self._set_notes(info)
         self.btn_update_install.setEnabled(updater.is_frozen())
         if not updater.is_frozen():
             self.update_status.setText(self.update_status.text() + " — 소스 실행 중이라 자동 설치 불가, `git pull` 하세요")
+
+    @staticmethod
+    def trim_notes(notes: str) -> str:
+        """앱 안에서 보여줄 부분만 남긴다 — 제목(버전은 위에 이미 있다)과 '내려받기' 안내는 뺀다."""
+        lines = (notes or "").strip().splitlines()
+        out: list[str] = []
+        for ln in lines:
+            head = ln.strip()
+            if head.startswith("## ") and ("내려받기" in head or "설치" in head):
+                break                                  # 여기부터는 릴리스 페이지용
+            if head.startswith("# ") or head.startswith("**Full Changelog**"):
+                continue
+            out.append(ln)
+        return "\n".join(out).strip()
+
+    def _set_notes(self, info) -> None:
+        """릴리스 노트를 마크다운으로. 내용이 없으면 릴리스 페이지로 안내한다."""
+        notes = self.trim_notes(info.notes)
+        if not notes:
+            url = getattr(info, "html_url", "") or f"https://github.com/progh2/catmoa/releases/tag/{info.tag}"
+            notes = f"이 버전의 변경 내역이 없습니다.\n\n[릴리스 페이지에서 보기]({url})"
+        self.update_notes.setMarkdown(notes)
 
     def _update_check(self):
         self.btn_update_check.setEnabled(False)
