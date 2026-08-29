@@ -1,163 +1,64 @@
-<p align="center"><img src="assets/icon.png" width="160" alt="catmoa 아이콘"></p>
+# 캣모아(CatMoa)
 
-<h1 align="center">catmoa — 교사를 위한 일정 수집 고양이</h1>
+> 공문·메신저·이미지에 흩어진 학교 일정을 고양이에게 던지면, AI가 뽑아 Google 캘린더와 할 일에 넣어 주는 데스크톱 도구
 
-<p align="center">
-학교 곳곳에 흩어진 일정·할 일(한글 문서, PDF, 쿨메신저 쪽지, 스크린샷, 복사한 텍스트, 휴대폰 메모)을<br>
-<b>고양이에게 던져주면</b> AI가 뽑아내고, 확인 한 번으로 <b>Google 캘린더 / Google Tasks</b>에 넣어주는 데스크톱 프로그램입니다.<br>
-macOS · Windows · Linux
-</p>
+[🌐 바로 사용하기](https://progh2.github.io/catmoa/) [💻 소스코드](https://github.com/progh2/catmoa) [▶️ 시연 보기](https://youtu.be/dnzbR_AT910?si=etedKAQkJWWEOHj6)
 
-<p align="center">🏠 <b>소개·다운로드 페이지</b>: <a href="https://progh2.github.io/catmoa/">progh2.github.io/catmoa</a> · <a href="https://github.com/progh2/catmoa/releases/latest">최신 릴리스</a></p>
+## 대표 화면과 링크
 
-> 교사 해커톤 프로젝트. 목표는 "사용자 개입 최소화"입니다.
+![대표 화면](https://dutmlwajdhdbjmdijefy.supabase.co/storage/v1/object/sign/post-images/comment-a5235921-397d-4fe5-973c-6a31202808f4.jpg?token=eyJraWQiOiI4ZmZiMjFmMC1hMjhmLTRiM2QtODJlMi1jYjJiNDgxNTBmYjUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwb3N0LWltYWdlcy9jb21tZW50LWE1MjM1OTIxLTM5N2QtNGZlNS05NzNjLTZhMzEyMDI4MDhmNC5qcGciLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg3OTI4NDMxLCJleHAiOjIxMDMyODg0MzF9.wcD6W5O18O3mLDoPVaCtzXfjxeEuLfLjFCbpp-YehTY)
 
-<p align="center"><img src="assets/cat/idle_1.png" width="88" alt="대기"> <img src="assets/cat/hover_tr.png" width="88" alt="마우스 쳐다봄"> <img src="assets/cat/searching.png" width="88" alt="서류 찾는 중"> <img src="assets/cat/eating_1.png" width="88" alt="분석 중"> <img src="assets/cat/happy.png" width="88" alt="완료"> <img src="assets/cat/bored.png" width="88" alt="심심"></p>
+## 최종적으로 해결한 문제
 
-## 한눈에 보는 흐름
+교사에게 전달되는 일정과 업무는 공문(HWP, PDF), 메신저 쪽지, 이미지, 급하게 적어 둔 메모 등 여러 곳에 흩어져 있습니다. 이를 일일이 열어 읽고 캘린더에 옮겨 적는 과정에서 시간이 들고, 제출 기한을 놓치거나 같은 일정을 중복으로 등록하는 일이 생겼습니다. 또한 "1교시 끝나고", "퇴근 전까지"처럼 학교에서만 통하는 시간 표현은 일반적인 도구로는 처리되지 않았습니다.
 
-```
-  입력 (아무거나 던지기)                  처리                                출력
- ────────────────────────────    ────────────────────────────────    ──────────────────────
-  📄 .hwp / .hwpx / .pdf 드롭   ─┐
-  🖼  스크린샷 붙여넣기 (호버+⌘V)  ─┤   통합 큐 ─▶ 문서 파싱 ─▶ LLM 추출        📅 Google Calendar
-  📝 텍스트 붙여넣기             ─┼─▶ (순차)     (텍스트/이미지)  ├─ 일정(event)   ✅ Google Tasks
-  💬 쿨메신저 새 쪽지 (30초 폴링) ─┤                              ├─ 할 일(task, 날짜 없어도)     ▲
-  📥 Google Tasks 인박스        ─┘                              └─ 내 업무와 무관 → 알림만     │
-                                                                          │                 │
-        고양이 위젯 ◀── 표정으로 상태 표시 ──┐        검토 창 ◀───────────┘                 │
-        (대기·서류 찾기·냠냠·완료·오류·심심)  │   항목별 📅/✅ 선택, 목록(카테고리), 알람, 편집    │
-                                          │        │                                       │
-                                          └──▶ 중복 검사 ─▶ 건너뛰기 / 기존 갱신 / 새로 등록 ──┘
-```
+### 어떻게 풀었나요?
 
-## 주요 기능
+문서, 이미지, 텍스트를 화면 위 고양이에게 드래그하거나 붙여넣으면 AI가 일정과 할 일을 추출합니다. 사용자는 카드로 한 장씩 넘기며 확인·수정하고, 캘린더 / 할 일 / 둘 다 중에서 골라 Google 캘린더 또는 테스크에 등록합니다. 등록 직전에 기존 항목과 중복인지 확인해 건너뛰기·갱신·새로 등록을 선택할 수 있습니다.  
+학교 상황에 맞추기 위해 출퇴근·교시·점심 시각을 설정에 넣어 시간 표현을 실제 시각으로 해석하고, 담당 학년·교과를 기준으로 나와 무관한 안내는 걸러 냅니다. 외부 AI로 보내기 전에는 이름·연락처 등 개인정보를 가린 뒤 전송하고, 결과에서 원문으로 되돌립니다.
 
-| 기능 | 설명 |
-|---|---|
-| 고양이 플로팅 위젯 | 항상 위에 떠 있는 작은 고양이. 상태별 표정(대기·놀람·서류 찾기·냠냠·완료·일정 없음·오류·심심·잠). 새 버전이 있으면 머리핀 배지 |
-| 입력 | `.hwp`, `.hwpx`, `.pdf`(스캔본은 이미지로), 이미지, 텍스트 파일 드롭 · 고양이 위에 마우스를 올린 채 `Ctrl+V`/`⌘V`(스크린샷·텍스트·파일) · 우클릭 메뉴 |
-| 통합 큐 | 연달아 여러 개를 넣어도 차례대로 처리 |
-| AI 추출 | 일정(event)과 할 일(task) 분리, 상대 날짜("다음 주 목요일") 해석, 표·주간계획서의 여러 항목 추출, **요청이 있으면 날짜가 없어도 할 일**로 추출, 행동 문장 제목 |
-| 내 역할 기반 필터 | 설정에 역할(예: "2학년 3반 담임, 정보 교과")을 적으면 다른 학년·교과·부서만의 쪽지는 등록 제안 없이 알림만 |
-| 검토 창 | 항목별 **📅 캘린더 / ✅ 태스크** 체크(둘 다 가능 — 캘린더엔 마감일, 태스크엔 할 일), 태스크 목록(카테고리) 선택, 알람, 날짜·시간·장소·제목 편집, 원본 보기 |
-| 중복 검사 | 등록 전 기존 캘린더/태스크와 비교해 비슷한 항목이 있으면 **건너뛰기 / 기존 갱신 / 새로 등록** 선택 |
-| 사용자 분류 규칙 | 캘린더/태스크 분류 규칙, 태스크 카테고리(Google Tasks 목록) 규칙을 자유 텍스트로 |
-| 개인정보 마스킹 | AI로 보내기 전에 이름·전화·이메일·주민번호·주소·학번 등을 `[이름1]` 식 토큰으로 가리고(PC 안에서), 결과는 원문으로 되돌림. 캘린더 메모·태스크 원문은 가리지 않음. 설정에서 끄기/확인 가능 |
-| 강력한 마스킹 (선택) | 규칙이 놓치는 문맥형 이름·주소까지 잡는 한국어 PII 모델을 **켤 때 내려받아**(약 300MB) 이 PC 안에서 실행 |
-| Google 로그인 | JSON 파일 없이 브라우저 로그인만으로 연결 (토큰은 OS 키체인) |
-| Google Tasks 인박스 | 휴대폰 등에서 대충 적어둔 "인박스" 목록 항목을 불러와 분석·정리 (목록명 변경 가능, 없으면 생성 제안) |
-| 쿨메신저 연동 (Windows) | 새 쪽지를 기본 30초 간격으로 확인해 자동 분석 (기본 꺼짐). 답장에 쌓인 이전 대화는 분리해 최근 내용 우선. 연결 테스트 · 지금 확인 버튼 |
-| LLM 선택 | Claude / ChatGPT(OpenAI) / Gemini(Google) / Solar(Upstage) / 로컬 Ollama — 모델 목록 조회, 연결 테스트. Solar는 이미지를 Upstage 문서 인식(OCR)으로 |
-| 알람 | 항목별 알람 여부·N분 전. Google Tasks는 알림이 없어 태스크 알람은 캘린더 알림 이벤트로(옵션) |
-| 트레이 아이콘 · 숨기기 | 항상 떠 있는 트레이 아이콘. 고양이 우클릭 → **숨기기**로 트레이에 넣고, 아이콘 클릭으로 복귀(숨김 중엔 잠자는 고양이 아이콘). macOS는 메뉴 막대가 가득 차면 노치 뒤로 밀려 안 보일 수 있음 |
-| 고양이 크기 | 설정 → 일반 → 슬라이더 0.5×~3.0× (슬라이더를 움직이면 바로 반영, 취소하면 원래대로) |
-| 자동 실행 · 자동 업데이트 | 설정에서 OS 시작 시 자동 실행 · 새 릴리스 확인 → 배지 → 설정에서 설치(내려받기 → 교체 → 재실행) |
+## 핵심 기능
 
-## 지원 환경
+- **다양한 자료 입력**: HWP·HWPX·PDF 파일, 이미지·스크린샷, 복사한 텍스트를 드래그하거나 붙여넣을 수 있습니다.
+- **AI 일정 추출**: 문서에서 행사 일정, 제출 기한, 해야 할 일, 장소, 알림 시간 등을 자동으로 찾아냅니다.
+- **등록 전 검토**: 추출 결과를 직접 수정하고, 각 항목을 캘린더 일정 또는 할 일로 선택할 수 있습니다.
+- **Google 연동**: 확인한 내용을 Google Calendar와 Google Tasks에 등록합니다.
+- **중복 방지**: 기존 일정·할 일과 비슷한 항목을 찾아 건너뛰기, 업데이트, 신규 등록 중에서 선택하게 합니다.
+- **메신저 및 할 일 수집**: Windows에서는 쿨메신저 쪽지를 자동 감지하고, Google Tasks의 ‘인박스’ 항목도 가져와 정리할 수 있습니다.
+- **맞춤 분류**: 담당 학년·교과 같은 개인 조건과 사용자 규칙에 따라 필요한 일정만 걸러냅니다.
+- **여러 AI 지원**: Claude, OpenAI, Gemini, Upstage Solar, 로컬 Ollama 중 선택할 수 있습니다.
+- **데스크톱 고양이 UI**: 화면 위의 작은 고양이가 대기·분석·완료·오류 등의 처리 상태를 보여줍니다.
+- **개인정보 마스킹**: AI로 보내기 전에 이름·연락처·학번 등을 가리고, 결과를 받은 뒤 원문으로 되돌립니다(로컬 AI 모델 옵션 포함).
+- **학교 시간표 인식**: 출퇴근·교시·점심 시각을 설정해 두면 "1교시 후", "퇴근 전까지" 같은 표현을 실제 시각으로 바꿉니다.
+- **원문 함께 보관**: 캘린더 설명·할 일 메모 아래에 원문 일부를 남겨 나중에 구체적인 내용을 확인할 수 있습니다.
+- **자동 업데이트·자동 실행**: 새 버전이 나오면 고양이에 배지가 뜨고 앱 안에서 교체됩니다. OS 시작 시 자동 실행과 트레이 숨기기도 지원합니다.
 
-- macOS (Apple Silicon), Windows 10/11 (x64, ARM은 x64 에뮬레이션), Linux x86_64 (X11 권장)
-- 릴리스에서 실행 파일을 내려받으면 Python 설치가 필요 없습니다.
-- LLM은 클라우드(Claude/OpenAI/Gemini/Upstage) 또는 로컬 Ollama. 개인정보가 걱정되면 Ollama를 권장합니다.
+## 사용 흐름과 사용 방법
 
-## 설치
+1. 사용자가 여러 방식으로 고양이에게 자료를 전달합니다 — 쿨메신저는 자동 감지, 텍스트 복사·화면 캡처 후 붙여넣기, PDF·HWP 파일 드래그 앤 드롭, Google Tasks에 음성·메모로 적어 둔 임시 항목 가져오기.
+2. 고양이가 자료에서 개인정보를 가린 뒤 외부 API 또는 로컬 LLM으로 보내 일정·할 일을 추출합니다.
+3. 사람이 카드를 한 장씩 넘기며 내용이 맞는지 검토하고, 캘린더 / 할 일 / 둘 다 / 건너뛰기를 고릅니다.
+4. 등록 직전 기존 항목과 중복인지 확인해 건너뛰기·갱신·새로 등록을 선택합니다.
+5. 확정된 항목이 업무 특성에 따라 Google Calendar 또는 Google Tasks(담당 목록)에 저장되고, 설정한 시각에 알림이 옵니다.
 
-### 실행 파일 (권장)
-[Releases](https://github.com/progh2/catmoa/releases)에서 OS에 맞는 파일을 내려받습니다.
+- 사용 환경: PC 데스크톱 — Windows 10/11, macOS(Apple Silicon), Linux
+- 사용 조건: - Google 계정 로그인이 필요합니다(Google 캘린더, 테스크에 등록하기 위해). 로그인은 브라우저에서 진행되며 별도 키 파일은 필요 없습니다.  
+AI는 다음 중 하나를 선택합니다.  
+  * 유료 API 키 입력: Claude(Anthropic), ChatGPT(OpenAI), Gemini(Google), Solar(Upstage)  
+  * 무료: 로컬 LLM(Ollama)을 설치하고 모델을 내려받아 사용 - 이 경우 문서 내용이 외부로 전송되지 않습니다.  
+- 프로그램 자체는 무료 오픈소스(MIT)이며, 별도 회원가입, 서버 계정이 없습니다.
 
-| OS | 파일 | 실행 |
-|---|---|---|
-| macOS (Apple Silicon) | `catmoa-macos-arm64.dmg` | 더블클릭 → `catmoa.app`을 Applications로 드래그. 처음 실행 시 경고가 뜨면 아래 [macOS 첫 실행](#macos-첫-실행) |
-| Windows 10/11 | `catmoa-windows-x86_64.exe` | 단일 실행 파일 — 원하는 폴더에 두고 더블클릭 (첫 화면까지 몇 초). ARM Windows도 같은 파일. 첫 실행 경고는 [Windows 첫 실행](#windows-첫-실행) |
-| Linux (x86_64) | `catmoa-linux-x86_64.tar.gz` | 압축 해제 → `./catmoa/catmoa`. `libEGL.so.1` 등이 없다는 오류가 나면 [Linux 준비](#linux-준비) |
+## 기술 스택과 실행 방법
 
-앱은 Dock/작업표시줄에 나타나지 않고 고양이만 떠 있습니다. 종료·설정은 고양이 **우클릭**.
-
-#### macOS 첫 실행
-서명·공증이 되지 않은 앱이라 macOS가 한 번 막습니다 (macOS 15부터는 "우클릭 → 열기"도 통하지 않습니다).
-- **시스템 설정으로 허용**: 경고에서 **완료** → **시스템 설정 → 개인정보 보호 및 보안** → 아래쪽 `"catmoa"이(가) 차단되었습니다` 옆 **그래도 열기**
-- **터미널**: `xattr -cr /Applications/catmoa.app`
-
-#### Windows 첫 실행
-코드 서명이 없어 SmartScreen이 한 번 막습니다.
-- **Edge가 다운로드를 차단**: 다운로드 목록에서 파일 위 **…** → **유지** → "자세히 표시" → **그래도 유지**. 계속 막히면 Chrome/Firefox로 받으세요.
-- **실행 시 "Windows의 PC 보호" 창**: **추가 정보** → **실행**.
-- 학교 PC처럼 정책으로 막힌 경우: 관리자에게 예외 등록을 요청하거나 [소스에서 실행](#소스에서-실행-개발).
-
-#### Linux 준비
-```bash
-sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 libdbus-1-3 libfontconfig1 libglib2.0-0
-```
-디스플레이(X11/Wayland)가 없는 서버·컨테이너에서는 실행되지 않습니다.
-
-### 소스에서 실행 (개발)
-```bash
-git clone https://github.com/progh2/catmoa.git
-cd catmoa
-./run.sh          # macOS / Linux
-run.cmd           # Windows
-```
-Python 3.11 이상. 가상환경 생성과 의존성 설치는 스크립트가 처리합니다.
-
-## 첫 설정 (약 1분)
-
-1. 고양이 우클릭 → **설정**
-2. **LLM** 탭: 공급자 → API 키(또는 Ollama 주소) → **모델 목록 불러오기** → 모델 선택 → **연결 테스트**
-3. **Google** 탭: **로그인** → 브라우저에서 계정 선택
-4. **분류 규칙** 탭 (선택): 내 역할, 캘린더/태스크 분류 규칙, 태스크 카테고리 규칙
-   · **교사** 탭: 출근·퇴근, 학교급(수업 시간), 교시·점심 시각 → "3교시", "점심시간", "퇴근 전" 해석에 사용. 1교시를 고치면 2~4교시가, 5교시를 고치면 6~7교시가 자동으로 따라오고 점심은 4교시 종료~5교시 시작으로 계산됩니다
-   · **개인정보** 탭: 마스킹 켜기/끄기 + **가려보기** 로 무엇이 어떻게 가려지는지 즉시 확인
-5. **일반** 탭 (선택): 기본 대상(자동/캘린더/태스크/둘 다), 알람 기본값, 인박스 목록명, 자동 실행, 고양이 크기
-6. **쿨메신저** 탭 (Windows, 선택): 사용 켜기, 간격, 이전 대화 참고 길이 → **연결 테스트**
-
-## 사용법
-
-- 파일을 고양이 위로 끌어다 놓거나, 스크린샷을 찍은 뒤 고양이 위에 마우스를 올리고 붙여넣기
-- 고양이가 서류를 뒤지고 밥을 먹는 동안 기다리면 **검토 창**이 뜸 → 항목별 📅/✅ 선택 → **등록**
-- 비슷한 항목이 이미 있으면 **중복 확인 창**에서 처리 방법 선택
-- 일정이 없으면 고양이가 시무룩해지고 "붙여넣은 텍스트에 일정이 없네요" 안내가 잠깐 뜸
-- 우클릭 메뉴: 붙여넣기 · Google Tasks 인박스 가져오기 · 쿨메신저 지금 확인(Windows) · 설정 · 종료
-
-## 이미지 고양이
-
-고양이 그림은 `assets/cat/`의 PNG입니다. 직접 그린 그림으로 바꾸려면 [assets/cat/README.md](assets/cat/README.md)의 규격대로 파일을 넣으세요 (설정 폴더 `cat/`에 넣으면 빌드 없이 바로 반영). 원본에서 배포용 파일을 만드는 스크립트는 `tools/prepare_cat.py`.
-
-## 개인정보 안내
-
-- 입력한 문서·이미지·쪽지 내용은 **선택한 LLM 공급자**로 전송됩니다. 외부 전송이 걱정되면 로컬 Ollama를 선택하세요.
-- 보내기 전에 **개인정보 마스킹**(기본 켜짐)이 이름·전화·이메일·주민번호·주소·학번 등을 PC 안에서 토큰으로 바꿉니다. 설정 → **개인정보** 탭에서 끄거나 **가려보기**로 확인할 수 있습니다. 이미지 속 글자는 가릴 수 없습니다.
-  - 기본은 **규칙 기반**(내장, 즉시 동작)입니다. 설정 → 개인정보 → **강력한 마스킹**을 켜면 한국어 PII 모델 ([korean-pii-e5-base](https://huggingface.co/FrameByFrame/korean-pii-e5-base), ONNX int8 약 300MB)를 한 번 내려받아 규칙과 **함께** 씁니다. 규칙만으로는 놓치는 "지우 어머님", "도현이" 같은 문맥형 이름을 잡아 줍니다.
-  - 모델은 `onnxruntime` 으로 **이 PC 안에서만** 돌고, 받은 뒤에는 인터넷이 없어도 동작합니다. 설정 폴더 `pii_model/` 에 저장되며 같은 화면에서 삭제할 수 있습니다 (환경변수 `CATMOA_PII_MODEL` 로 경로 지정 가능).
-  - 일정 날짜는 가리지 않습니다 — "9월 3일 14:00" 같은 표현은 그대로 두고, "생년월일" 맥락의 날짜만 가립니다.
-- 쿨메신저 DB는 **읽기 전용 복사본**으로만 접근하며 원본을 수정하지 않습니다.
-- Google 토큰과 API 키는 OS 키체인(macOS Keychain / Windows Credential Manager / Linux Secret Service)에 저장됩니다.
-- 별도 서버 없음. 데이터는 사용자 PC ↔ LLM ↔ Google 사이에서만 오갑니다. 업데이트 확인만 GitHub에 요청합니다.
-
-## 개발
-
-- 계획·아키텍처·결정 기록: [docs/PRD.md](docs/PRD.md) · 진행: [Milestones](https://github.com/progh2/catmoa/milestones) · [Issues](https://github.com/progh2/catmoa/issues)
-- 테스트: `pytest` (GUI 테스트는 offscreen)
-- 로컬 빌드: `pip install pyinstaller && python build.py` → `dist/`
-- 배포판 점검: `catmoa --selftest` (설정 폴더, 모델 실행기/설치 상태, 마스킹 시험 결과를 화면 없이 출력)
-- 강력한 마스킹 모델 갱신: `python tools/convert_pii_model.py --out dist/pii_model` 로 ONNX int8 변환 후,
-  `gh release upload pii-model-v1 dist/pii_model/*` (앱 릴리스와 별개인 prerelease 태그 — 자동 업데이트에 잡히지 않음)
-- 릴리스: `src/__init__.py`의 `__version__`을 올리고 같은 값으로 `git tag vX.Y.Z && git push origin vX.Y.Z` → GitHub Actions가 3-OS 빌드 후 Release 첨부 (버전 불일치면 실패). 실행 중인 앱들은 배지로 새 버전을 알게 됩니다.
-- 릴리스 노트는 `tools/release_notes.py` 가 태그 사이 커밋을 `feat`/`fix`/… 로 묶어 한국어로 만듭니다 (CI가 자동 실행). 앱의 **설정 → 업데이트** 탭도 이 내용을 그대로 보여주므로, 커밋 제목을 사용자가 읽을 문장으로 씁니다.
-- 실검증 스크립트: `tools/check_llm.py <provider>` (모델 목록·연결·텍스트·이미지 추출), `tools/check_google.py --login --write`
-- Google OAuth 클라이언트 (필수, 1회):
-  1. [Google Cloud Console](https://console.cloud.google.com/) → 프로젝트 → **API 및 서비스**에서 *Google Calendar API*, *Google Tasks API* 사용 설정
-  2. OAuth 동의 화면 구성 → **앱 게시**(프로덕션; 테스트 모드는 토큰이 7일마다 만료) → 사용자 인증 정보 → **OAuth 클라이언트 ID → 데스크톱 앱**
-  3. ID/보안 비밀을 저장소 **Settings → Secrets and variables → Actions → Repository secrets**에 등록: `CATMOA_GOOGLE_CLIENT_ID`, `CATMOA_GOOGLE_CLIENT_SECRET`
-  4. 로컬 개발 시에는 프로젝트 루트에 `.env` (git 제외):
-     ```
-     CATMOA_GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
-     CATMOA_GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
-     ```
-  > 데스크톱 앱 클라이언트의 보안 비밀은 Google 정책상 비밀로 취급되지 않으므로 배포 바이너리에 포함해도 됩니다.
-- 코드 서명(선택): Windows SmartScreen/Edge 차단을 없애려면 **Azure Trusted Signing**(월 약 $10) 또는 OV/EV 인증서로 exe 서명, macOS는 Apple Developer($99/년)로 서명·공증. 인증서가 준비되면 워크플로우에 서명 단계를 추가하면 됩니다.
+- **화면**: Python + PySide6(Qt) 기반 데스크톱 앱. 항상 위에 떠 있는 프레임리스 고양이 위젯 + 검토/설정 다이얼로그, 시스템 트레이 아이콘
+- **서버·백엔드**: 서버 없음. 사용자 PC에서 Google Calendar/Tasks API와 직접 통신하고, 선택한 AI 공급자에 직접 요청
+- **AI**: 선택 사용: Claude(Anthropic), ChatGPT(OpenAI), Gemini(Google), Solar(Upstage), 로컬 Ollama. 개인정보 마스킹용 한국어 PII 탐지 모델은 ONNX로 PC 안에서 실행.
+- **저장소**: 로컬 저장. 설정은 사용자 설정 폴더의 JSON, API 키/OAuth 토큰은 OS 키체인(macOS Keychain / Windows Credential Manager / Linux Secret Service). 원본 문서/추출 이력은 저장하지 않음
+- **배포**: GitHub Actions로 Windows(단일 exe), macOS(dmg), Linux(tar.gz) 자동 빌드 -> 태그를 붙이면 GitHub Releases에 자동 첨부. GitHub Pages 소개 페이지에서 OS를 감지해 내려받기. 앱 안에서 새 버전 확인, 자동 업데이트 지원
 
 ### 폴더 구조
-```
+
+```text
 catmoa/
 ├── main.py                  # 진입점
 ├── build.py · catmoa.spec   # PyInstaller (Windows 단일 exe, macOS dmg, Linux tar.gz)
@@ -175,15 +76,82 @@ catmoa/
 │   └── ui/                  # 고양이 위젯, 검토·중복·설정 다이얼로그, 토스트
 ├── tests/
 ├── tools/                   # 아이콘·고양이 이미지 생성, 실검증 스크립트
+│   ├── privacy/             # 개인정보 마스킹 (규칙 + 선택형 로컬 AI 모델)
+│   └── single_instance.py   # 중복 실행 방지
 └── docs/                    # PRD, GitHub Pages 소개 페이지
 ```
 
-## 감사
+### 설치와 실행
 
-- 강력한 마스킹에 쓰는 AI 모델: [FrameByFrame/korean-pii-e5-base](https://huggingface.co/FrameByFrame/korean-pii-e5-base) (MIT) — 한국어 개인정보 탐지 모델(XLM-RoBERTa base). catmoa 는 이를 ONNX int8 로 변환해 배포합니다 (`tools/convert_pii_model.py`).
-- 개인정보 마스킹 규칙 설계는 [schift-io/schift-ko-pii-v6](https://huggingface.co/schift-io/schift-ko-pii-v6) 을 참고했습니다.
-- 쿨메신저 `.udb` 읽기 방식은 [dacisosl/coolm-helper](https://github.com/dacisosl/coolm-helper) (MIT)를 참고했습니다.
+```bash
+소개 페이지 또는 GitHub Releases에서 OS에 맞는 파일을 내려받아 실행합니다.      Windows: catmoa-windows-x86_64.exe 실행 (SmartScreen 경고 시 추가 정보 → 실행)    macOS: catmoa-macos-arm64.dmg 열고 응용 프로그램으로 복사 → 첫 실행 시 시스템 설정 → 개인정보 보호 및 보안 → "그래도 열기"    Linux: catmoa-linux-x86_64.tar.gz 압축 해제 후 ./catmoa/catmoa    개발자용: git clone 후 ./run.sh(macOS·Linux) 또는 run.cmd(Windows), Python 3.11+
+설치한 실행 파일을 실행하면 화면에 고양이가 뜹니다. 설정은 고양이 우클릭 → 설정. (설정에서 'OS 시작 시 자동 실행'을 켤 수 있습니다.)
+```
 
-## 라이선스
+- 필요한 환경변수(이름만): 직접 빌드할 때만 필요합니다: CATMOA_GOOGLE_CLIENT_ID, CATMOA_GOOGLE_CLIENT_SECRET (Google Cloud에서 발급한 데스크톱 앱 OAuth 클라이언트). 배포판을 내려받아 쓰는 사용자는 설정할 필요가 없습니다. AI API 키는 환경변수가 아니라 앱 설정 화면에서 입력해 OS 키체인에 저장됩니다.
 
-MIT
+## 작동 범위와 한계, 다음 계획
+
+- 지금까지 확인한 범위: 개발자 본인이 macOS(Apple Silicon)와 Parallels 위 Windows(ARM64)에서 실제 업무 자료로 사용했습니다. 실제로 받은 쿨메신저 쪽지·공문을 비식별화한 테스트셋 약 50건으로 분류·마스킹 성능을 점검했고, 자동 테스트 240개가 통과합니다. v1.0.0부터 v1.4.14까지 24개 버전을 실제로 배포·설치했습니다.
+
+### 기술적 한계
+
+- - 입력 자료의 형태와 표현에 따라 분류·요약이 정확하지 않을 수 있고, 선택한 AI 모델의 성능에 영향을 많이 받습니다.  
+- 개인정보 마스킹은 핵심 항목 대부분을 가리지만 100%는 아닙니다. 특히 문맥 없이 등장하는 인명이나 반–번호 형태는 놓칠 수 있어, 민감한 자료는 로컬 LLM(Ollama) 사용을 권합니다.  
+- 코드 서명·공증을 하지 않아 macOS·Windows 첫 실행 시 보안 경고가 뜹니다(안내 문서 제공).  
+- Google OAuth 앱 검증 전이라 로그인 과정에 "확인되지 않은 앱" 경고가 표시됩니다.  
+- 쿨메신저 자동 감지는 Windows 전용이며, 메신저의 저장 형식이 바뀌면 동작하지 않을 수 있습니다.  
+- 스캔본 PDF·이미지는 AI의 이미지 인식 품질에 좌우되며, 비전 지원 모델이 필요합니다.  
+- 강력한 마스킹 옵션은 약 150MB 모델을 추가로 내려받아야 하고, 저사양 PC에서는 처리 속도가 느려집니다.  
+- 지금까지의 검증은 개발자 본인 환경과 비식별 테스트셋 약 50건 수준으로, 여러 학교·여러 교사를 대상으로 한 현장 검증은 하지 못했습니다.
+
+### 다음 계획
+
+- - 더 다양한 메신저와 자료로부터 자동으로 입력을 받는 기능을 개발하고 싶습니다(학교 업무 포털, 메일, 공유 폴더 감시 등).  
+- 여러 교사와 함께 쓰는 현장 검증 — 학교급·시간표가 다른 환경에서 추출 정확도 측정.  
+- 개인정보 마스킹 정확도 개선(놓치는 인명·반번호 유형 보완)과 마스킹 결과 리포트 제공.  
+- macOS 공증·Windows 코드 서명, Google OAuth 앱 검증으로 첫 실행 경고 제거.  
+- 반복 일정·학사일정 일괄 등록, 등록 이력 되돌리기.
+
+## 교육 현장에서 사용할 때의 주의사항
+
+- **개인정보 처리 여부**: 처리함
+- **예상되는 위험**: 일정·업무 내용 중에 학생·보호자 개인정보가 포함될 수 있고, 이 정보가 AI API를 통해 외부로 넘어갈 수 있습니다.
+- **위험을 줄이려고 한 일**: 1. 로컬 LLM(Ollama)을 선택하면 외부 전송을 원천 차단할 수 있는 방법을 제공했습니다.  
+2. AI에 보내기 전에 개인정보 마스킹을 수행합니다 — 규칙 기반 탐지에 더해, 선택 옵션으로 PC 안에서만 도는 한국어 개인정보 탐지 모델을 함께 사용하는 2중 구조입니다. 결과에 남은 토큰은 등록 직전에 원문으로 복원됩니다.  
+3. 쿨메신저 연동은 기본 꺼짐이고, DB는 임시 복사본을 읽기 전용으로만 열어 원본을 건드리지 않습니다.  
+4. Google에는 사람이 검토·확정한 항목만 전송됩니다.  
+5. 서버·텔레메트리가 없고, API 키와 토큰은 OS 키체인에만 저장합니다.  
+6. 개인정보처리방침·서비스 약관을 공개하고, 앱이 요청하는 권한 범위와 저장 위치를 명시했습니다.
+- **멈춤 기준**: - 마스킹을 켠 상태에서 이름·연락처가 가려지지 않고 그대로 전송된 사례가 한 건이라도 확인되면, 해당 입력 경로 사용을 멈추고 로컬 LLM 전용으로 전환합니다.  
+- 사람 확인 없이 캘린더·할 일에 등록되는 경로가 발견되면 즉시 사용을 멈추고 수정합니다.
+- **검증 방법**: - 실제로 사용했던 메신저·공문 데이터를 비식별화한 테스트셋(약 50건)으로 분류·마스킹 성능을 점검했습니다. 대부분의 이름·휴대전화번호 등은 마스킹되었습니다.  
+- 설정 '개인정보' 탭의 '가려보기'로 실제 전송될 문장을 사람이 눈으로 확인합니다(마스킹 → 복원 왕복 검증).  
+- 자동 테스트 240개를 매 커밋 CI에서 실행하고, 앱에는 상태 점검 명령(catmoa --selftest)을 두었습니다.  
+- 3개 OS 빌드를 GitHub Actions에서 자동 생성하고, macOS·Windows 실기기에서 설치·업데이트를 직접 확인했습니다.
+
+### 교육적 태도 점검
+
+- 평가·추천·피드백을 프로그램이 대신 확정하지 않게 했나요?: 해당 없음 (교사의 일정·업무를 정리하는 도구로, 학생 평가나 추천을 다루지 않습니다.)
+- 학생이나 교사의 생각을 대신하지 않게 했나요?: 해당 없음 (AI 결과는 제안일 뿐이고, 무엇을 언제 할지는 사용자가 카드에서 직접 고칩니다.)
+- 저장·전달·제출 전에 사람이 확인할 수 있나요?: 해당함 (추출 결과를 카드로 한 장씩 확인·수정한 뒤에만 등록되고, 비슷한 항목이 있으면 다시 물어봅니다.)
+- 기기·계정·조작 문제로 참여에서 빠지는 사람이 없게 했나요?: 해당 없음 (학생 참여가 없는 교사 개인 도구이며, 3개 OS를 모두 지원하고 유료 API 없이 무료 로컬 AI로도 쓸 수 있습니다.)
+
+## 제작자와 라이선스
+
+- 윤서희 · 서울잠동초등학교
+- 함기훈 · 미림마이스터고등학교 · 기획,개발,릴리즈
+- 이상민 · 하계중학교
+- 윤서희
+- 함기훈
+- 이상민
+- **코드 라이선스**: MIT
+- **문서 라이선스**: CC BY 4.0
+- **외부 자료 출처**: - 고양이 이미지·아이콘: ChatGPT로 생성  
+- 쿨메신저 .udb 읽기 방식: https://github.com/dacisosl/coolm-helper (MIT) 참고  
+- 개인정보 마스킹에 사용하는 AI 모델: https://huggingface.co/FrameByFrame/korean-pii-e5-base (MIT) — 앱은 이 모델을 ONNX int8로 변환해 배포합니다.  
+- 마스킹 규칙 설계 참고: https://huggingface.co/schift-io/schift-ko-pii-v6
+
+## 교사 개발자 윤리 자가점검
+
+_아직 작성되지 않았어요._
