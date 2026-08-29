@@ -6,7 +6,7 @@
 
 ## 대표 화면과 링크
 
-![대표 화면](https://dutmlwajdhdbjmdijefy.supabase.co/storage/v1/object/sign/post-images/comment-a5235921-397d-4fe5-973c-6a31202808f4.jpg?token=eyJraWQiOiI4ZmZiMjFmMC1hMjhmLTRiM2QtODJlMi1jYjJiNDgxNTBmYjUiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwb3N0LWltYWdlcy9jb21tZW50LWE1MjM1OTIxLTM5N2QtNGZlNS05NzNjLTZhMzEyMDI4MDhmNC5qcGciLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzg3OTI4NDMxLCJleHAiOjIxMDMyODg0MzF9.wcD6W5O18O3mLDoPVaCtzXfjxeEuLfLjFCbpp-YehTY)
+![대표 화면](docs/hero.jpg)
 
 ## 최종적으로 해결한 문제
 
@@ -73,11 +73,11 @@ catmoa/
 │   ├── pipeline/            # 통합 처리 큐
 │   ├── gsync/               # Google OAuth / Calendar / Tasks / 등록 / 중복 검사
 │   ├── sources/             # 쿨메신저 udb·워처, Tasks 인박스
+│   ├── privacy/             # 개인정보 마스킹 (규칙 + 선택형 로컬 AI 모델)
+│   ├── single_instance.py   # 중복 실행 방지
 │   └── ui/                  # 고양이 위젯, 검토·중복·설정 다이얼로그, 토스트
 ├── tests/
-├── tools/                   # 아이콘·고양이 이미지 생성, 실검증 스크립트
-│   ├── privacy/             # 개인정보 마스킹 (규칙 + 선택형 로컬 AI 모델)
-│   └── single_instance.py   # 중복 실행 방지
+├── tools/                   # 아이콘·고양이 이미지 생성, 모델 변환, 실검증 스크립트
 └── docs/                    # PRD, GitHub Pages 소개 페이지
 ```
 
@@ -92,22 +92,22 @@ catmoa/
 
 ## 작동 범위와 한계, 다음 계획
 
-- 지금까지 확인한 범위: 개발자 본인이 macOS(Apple Silicon)와 Parallels 위 Windows(ARM64)에서 실제 업무 자료로 사용했습니다. 실제로 받은 쿨메신저 쪽지·공문을 비식별화한 테스트셋 약 50건으로 분류·마스킹 성능을 점검했고, 자동 테스트 240개가 통과합니다. v1.0.0부터 v1.4.14까지 24개 버전을 실제로 배포·설치했습니다.
+- 지금까지 확인한 범위: 개발자 본인이 macOS(Apple Silicon)와 Parallels 위 Windows(ARM64)에서 실제 업무 자료로 사용했습니다. 실제로 받은 쿨메신저 쪽지·공문을 비식별화한 테스트셋 약 50건으로 분류·마스킹 성능을 점검했고, 자동 테스트 246개가 통과합니다. v1.0.0부터 v1.4.14까지 24개 버전을 실제로 배포·설치했습니다.
 
 ### 기술적 한계
 
-- - 입력 자료의 형태와 표현에 따라 분류·요약이 정확하지 않을 수 있고, 선택한 AI 모델의 성능에 영향을 많이 받습니다.  
+- 입력 자료의 형태와 표현에 따라 분류·요약이 정확하지 않을 수 있고, 선택한 AI 모델의 성능에 영향을 많이 받습니다.  
 - 개인정보 마스킹은 핵심 항목 대부분을 가리지만 100%는 아닙니다. 특히 문맥 없이 등장하는 인명이나 반–번호 형태는 놓칠 수 있어, 민감한 자료는 로컬 LLM(Ollama) 사용을 권합니다.  
 - 코드 서명·공증을 하지 않아 macOS·Windows 첫 실행 시 보안 경고가 뜹니다(안내 문서 제공).  
 - Google OAuth 앱 검증 전이라 로그인 과정에 "확인되지 않은 앱" 경고가 표시됩니다.  
 - 쿨메신저 자동 감지는 Windows 전용이며, 메신저의 저장 형식이 바뀌면 동작하지 않을 수 있습니다.  
 - 스캔본 PDF·이미지는 AI의 이미지 인식 품질에 좌우되며, 비전 지원 모델이 필요합니다.  
-- 강력한 마스킹 옵션은 약 150MB 모델을 추가로 내려받아야 하고, 저사양 PC에서는 처리 속도가 느려집니다.  
+- 강력한 마스킹 옵션은 약 295MB 모델을 추가로 내려받아야 하고, 저사양 PC에서는 처리 속도가 느려집니다.  
 - 지금까지의 검증은 개발자 본인 환경과 비식별 테스트셋 약 50건 수준으로, 여러 학교·여러 교사를 대상으로 한 현장 검증은 하지 못했습니다.
 
 ### 다음 계획
 
-- - 더 다양한 메신저와 자료로부터 자동으로 입력을 받는 기능을 개발하고 싶습니다(학교 업무 포털, 메일, 공유 폴더 감시 등).  
+- 더 다양한 메신저와 자료로부터 자동으로 입력을 받는 기능을 개발하고 싶습니다(학교 업무 포털, 메일, 공유 폴더 감시 등).  
 - 여러 교사와 함께 쓰는 현장 검증 — 학교급·시간표가 다른 환경에서 추출 정확도 측정.  
 - 개인정보 마스킹 정확도 개선(놓치는 인명·반번호 유형 보완)과 마스킹 결과 리포트 제공.  
 - macOS 공증·Windows 코드 서명, Google OAuth 앱 검증으로 첫 실행 경고 제거.  
@@ -127,7 +127,7 @@ catmoa/
 - 사람 확인 없이 캘린더·할 일에 등록되는 경로가 발견되면 즉시 사용을 멈추고 수정합니다.
 - **검증 방법**: - 실제로 사용했던 메신저·공문 데이터를 비식별화한 테스트셋(약 50건)으로 분류·마스킹 성능을 점검했습니다. 대부분의 이름·휴대전화번호 등은 마스킹되었습니다.  
 - 설정 '개인정보' 탭의 '가려보기'로 실제 전송될 문장을 사람이 눈으로 확인합니다(마스킹 → 복원 왕복 검증).  
-- 자동 테스트 240개를 매 커밋 CI에서 실행하고, 앱에는 상태 점검 명령(catmoa --selftest)을 두었습니다.  
+- 자동 테스트 246개를 매 커밋 CI에서 실행하고, 앱에는 상태 점검 명령(catmoa --selftest)을 두었습니다.  
 - 3개 OS 빌드를 GitHub Actions에서 자동 생성하고, macOS·Windows 실기기에서 설치·업데이트를 직접 확인했습니다.
 
 ### 교육적 태도 점검
@@ -140,17 +140,13 @@ catmoa/
 ## 제작자와 라이선스
 
 - 윤서희 · 서울잠동초등학교
-- 함기훈 · 미림마이스터고등학교 · 기획,개발,릴리즈
+- 함기훈 · 미림마이스터고등학교 · 기획, 개발, 릴리즈
 - 이상민 · 하계중학교
-- 윤서희
-- 함기훈
-- 이상민
 - **코드 라이선스**: MIT
 - **문서 라이선스**: CC BY 4.0
 - **외부 자료 출처**: - 고양이 이미지·아이콘: ChatGPT로 생성  
 - 쿨메신저 .udb 읽기 방식: https://github.com/dacisosl/coolm-helper (MIT) 참고  
-- 개인정보 마스킹에 사용하는 AI 모델: https://huggingface.co/FrameByFrame/korean-pii-e5-base (MIT) — 앱은 이 모델을 ONNX int8로 변환해 배포합니다.  
-- 마스킹 규칙 설계 참고: https://huggingface.co/schift-io/schift-ko-pii-v6
+- 개인정보 마스킹에 사용하는 AI 모델: https://huggingface.co/FrameByFrame/korean-pii-e5-base (MIT) — 앱은 이 모델을 ONNX int8로 변환해 배포합니다.
 
 ## 교사 개발자 윤리 자가점검
 
