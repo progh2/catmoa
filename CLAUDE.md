@@ -12,7 +12,8 @@
 - 테스트: `pytest` (pytest.ini에 pythonpath=. 설정됨)
 
 ## 컨텍스트 앵커
-- intent: v1.4.15 — 학교망 SSL 검사 장비 대응(#63): 학교망 프록시가 자체 CA 로 TLS 재서명 → 얼린 앱의 certifi 검증이 실패해 구글 로그인 불가. `main.use_os_trust_store()` 가 truststore.inject_into_ssl() 로 OS 인증서 저장소(Windows 저장소/Keychain) 사용, `--selftest` 에 '인증서 검증' 줄 추가. requirements 에 truststore(순수 wheel)
+- intent: PC 시계 오차 검출(#64, 미태그): `src/netdiag.py` — HTTP Date 헤더(gstatic/captive.apple 후보)로 clock_skew_seconds, 5분 이상이면 경고. 구글 로그인 CERTIFICATE_VERIFY_FAILED 에 ssl_failure_hint(시계 크면 시계 안내, 아니면 학교망 보안 장비 안내) 덧붙임, `--selftest` 'PC 시계' 줄. HTTPS 는 시계 틀어지면 그 자체가 실패하므로 반드시 HTTP 로 확인
+- (이전) v1.4.15 — 학교망 SSL 검사 장비 대응(#63): 학교망 프록시가 자체 CA 로 TLS 재서명 → 얼린 앱의 certifi 검증이 실패해 구글 로그인 불가. `main.use_os_trust_store()` 가 truststore.inject_into_ssl() 로 OS 인증서 저장소(Windows 저장소/Keychain) 사용, `--selftest` 에 '인증서 검증' 줄 추가. requirements 에 truststore(순수 wheel)
 - (이전) v1.4.14 — 고양이 크기 최대 10배(#61: cat_faces.MIN_SCALE/MAX_SCALE + clamp_scale 로 상한 일원화 — 이전엔 config/cat_widget/cat_faces/슬라이더가 각자 3.0 으로 잘랐다), CatWidget.keep_on_screen() 으로 커지면 화면 안으로 복귀(화면보다 크면 좌상단 정렬). 원본 이미지가 320px 이라 4× 이상은 흐림
 - (이전) v1.4.13 — **강력한 마스킹**(#60): korean-pii-e5-base(MIT, XLM-R base)를 `tools/convert_pii_model.py` 로 ONNX int8 변환 → 릴리스 태그 `pii-model-v1`(prerelease, 자동 업데이트에 안 잡힘)에 자산으로 첨부. 앱에는 onnxruntime+tokenizers 만 포함(dmg 107→143MB). 설정 → 개인정보에서 켜면 295MB 내려받아 `pii_model/` 에 설치, `src/privacy/strong.py` 가 규칙과 함께 사용. **일정 날짜는 절대 가리지 않음**(private_date 는 앞 20자에 생년월일 힌트가 있을 때만). `catmoa --selftest` 로 상태 점검. Actions Node 24(#57), 직함 뒤 이름+성씨 게이트(#58), 설정 창 잘림(#59)
 - (이전) v1.4.12 — 고양이 크기 슬라이더 실시간 반영(#53: SettingsDialog(scale_preview=) + 120ms 디바운스, 취소 시 복원), 교시 자동 연쇄(#54: TeacherSettings.cascade/cascade_all/sync_lunch, 오전 1~4·오후 5~7 블록, 점심=4교시 종료~5교시 시작, lunch_auto), 설정 '개인정보' 탭(#55: 마스킹 on/off + '가려보기' 로 mask_text 실행·복원 왕복 검증, TAB_INDEX 재배치), 설정 창 최대화 버튼+글자 1.15배(#56)

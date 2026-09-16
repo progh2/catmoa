@@ -44,6 +44,9 @@ def selftest() -> int:
 
     os_trust = getattr(ssl.SSLContext, "__module__", "").startswith("truststore")
     print(f"인증서 검증      : {'OS 저장소 (truststore)' if os_trust else '번들 certifi'}")
+    from src import netdiag
+
+    print(f"PC 시계          : {netdiag.describe_clock(netdiag.clock_skew_seconds())}")
     print(f"설정 폴더        : {cfg.config_dir()}")
     print(f"모델 실행기      : {'있음' if strong.runtime_available() else '없음'} (onnxruntime + tokenizers)")
     print(f"강력한 마스킹 모델: {strong.status_line()}")

@@ -132,7 +132,9 @@ class GoogleAuth:
                 timeout_seconds=300,
             )
         except Exception as e:  # noqa: BLE001
-            raise GoogleAuthError(f"로그인에 실패했습니다: {e}") from e
+            from src import netdiag
+
+            raise GoogleAuthError(f"로그인에 실패했습니다: {e}{netdiag.ssl_failure_hint(str(e))}") from e
         self._creds = creds
         self._email = self._fetch_email(creds)
         self._save()
