@@ -22,6 +22,9 @@ Pillow>=10.0
 onnxruntime>=1.17
 tokenizers>=0.19
 
+# 학교망 등 SSL 검사(TLS 인터셉트) 환경 대응 — OS 인증서 저장소 사용
+truststore>=0.9
+
 # Google 연동
 google-auth>=2.30
 google-auth-oauthlib>=1.2

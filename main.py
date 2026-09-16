@@ -17,6 +17,22 @@ LINUX_DEPS_HINT = (
 )
 
 
+def use_os_trust_store() -> bool:
+    """학교망 SSL 검사 장비(#63) 대응: 인증서 검증에 번들 certifi 대신 OS 저장소를 쓴다.
+
+    학교 PC 는 검사 장비의 CA 가 Windows 저장소/Keychain 에만 설치돼 있어,
+    certifi 만 보는 얼린 앱은 구글 로그인 등 모든 HTTPS 가 실패한다.
+    """
+    try:
+        import truststore
+
+        truststore.inject_into_ssl()
+        return True
+    except Exception as e:  # noqa: BLE001 - 실패해도 certifi 로 동작은 한다
+        print(f"[catmoa] OS 인증서 저장소 사용 불가(certifi 로 동작): {e}", file=sys.stderr)
+        return False
+
+
 def selftest() -> int:
     """`catmoa --selftest` — 화면 없이 상태만 찍는다 (배포판 점검·문의 대응용)."""
     from src import __version__
@@ -24,6 +40,10 @@ def selftest() -> int:
     from src.privacy import mask_text, strong
 
     print(f"catmoa {__version__}  (frozen={getattr(sys, 'frozen', False)})")
+    import ssl
+
+    os_trust = getattr(ssl.SSLContext, "__module__", "").startswith("truststore")
+    print(f"인증서 검증      : {'OS 저장소 (truststore)' if os_trust else '번들 certifi'}")
     print(f"설정 폴더        : {cfg.config_dir()}")
     print(f"모델 실행기      : {'있음' if strong.runtime_available() else '없음'} (onnxruntime + tokenizers)")
     print(f"강력한 마스킹 모델: {strong.status_line()}")
@@ -35,6 +55,7 @@ def selftest() -> int:
 
 
 def main() -> int:
+    use_os_trust_store()
     if "--selftest" in sys.argv:
         return selftest()
     try:
